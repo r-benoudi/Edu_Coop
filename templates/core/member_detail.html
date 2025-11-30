@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ member.full_name }} - Educational Cooperative{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <a href="{% url 'core:member_list' %}" class="text-blue-600 hover:text-blue-800 flex items-center mb-4">
+        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+        Back to Members
+    </a>
+    <div class="flex items-center justify-between">
+        <div class="flex items-center">
+            <div class="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mr-4">
+                <span class="text-green-600 text-2xl font-medium">{{ member.first_name.0 }}{{ member.last_name.0 }}</span>
+            </div>
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">{{ member.full_name }}</h1>
+                <p class="text-gray-600 mt-1">Member since {{ member.join_date }}</p>
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'core:member_edit' member.pk %}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">Edit</a>
+            <a href="{% url 'core:member_delete' member.pk %}" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">Delete</a>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-1">
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Member Information</h2>
+            <div class="space-y-4">
+                <div>
+                    <p class="text-sm text-gray-500">Email</p>
+                    <p class="font-medium text-gray-800">{{ member.email }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Phone</p>
+                    <p class="font-medium text-gray-800">{{ member.phone|default:"Not provided" }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Member Type</p>
+                    {% if member.member_type == 'active' %}
+                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">Active Member</span>
+                    {% else %}
+                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-800">Passive Contributor</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <hr class="my-6">
+            
+            <div>
+                <p class="text-sm text-gray-500">Capital Shares</p>
+                <p class="text-3xl font-bold text-gray-800">{{ member.capital_shares }} DH</p>
+            </div>
+            
+            <hr class="my-6">
+            
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500">Status</span>
+                {% if member.is_active %}
+                <span class="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                {% else %}
+                <span class="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="lg:col-span-2">
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Profit Distribution History</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Share %</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for dist in distributions %}
+                        <tr>
+                            <td class="px-4 py-3 text-sm text-gray-800">{{ dist.financial_report.month|date:"F Y" }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-800">{{ dist.share_percentage }}%</td>
+                            <td class="px-4 py-3 text-sm font-medium text-gray-800">{{ dist.amount }} DH</td>
+                            <td class="px-4 py-3">
+                                {% if dist.is_paid %}
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Paid</span>
+                                {% else %}
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-4 py-3 text-center text-gray-500">No profit distributions yet</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

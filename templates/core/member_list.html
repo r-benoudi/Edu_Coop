@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Members - Educational Cooperative{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Cooperative Members</h1>
+        <p class="text-gray-600 mt-1">Manage cooperative members and their shares</p>
+    </div>
+    <a href="{% url 'core:member_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        Add Member
+    </a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+    <form method="get" class="flex gap-4">
+        <select name="type" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="">All Types</option>
+            <option value="active" {% if selected_type == 'active' %}selected{% endif %}>Active Members</option>
+            <option value="passive" {% if selected_type == 'passive' %}selected{% endif %}>Passive Contributors</option>
+        </select>
+        <button type="submit" class="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg font-medium transition-colors">Filter</button>
+    </form>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capital Shares</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Join Date</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for member in members %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
+                            <span class="text-green-600 font-medium">{{ member.first_name.0 }}{{ member.last_name.0 }}</span>
+                        </div>
+                        <div class="ml-4">
+                            <a href="{% url 'core:member_detail' member.pk %}" class="text-sm font-medium text-gray-900 hover:text-blue-600">{{ member.full_name }}</a>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ member.email }}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% if member.member_type == 'active' %}
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Active Member</span>
+                    {% else %}
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Passive Contributor</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">{{ member.capital_shares }} DH</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ member.join_date }}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% if member.is_active %}
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                    {% else %}
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <a href="{% url 'core:member_detail' member.pk %}" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+                    <a href="{% url 'core:member_edit' member.pk %}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</a>
+                    <a href="{% url 'core:member_delete' member.pk %}" class="text-red-600 hover:text-red-900">Delete</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="px-6 py-4 text-center text-gray-500">No members found</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

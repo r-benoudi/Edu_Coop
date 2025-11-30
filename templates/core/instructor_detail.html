@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ instructor.full_name }} - Educational Cooperative{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <a href="{% url 'core:instructor_list' %}" class="text-blue-600 hover:text-blue-800 flex items-center mb-4">
+        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+        Back to Instructors
+    </a>
+    <div class="flex items-center justify-between">
+        <div class="flex items-center">
+            <div class="h-16 w-16 bg-indigo-100 rounded-full flex items-center justify-center mr-4">
+                <span class="text-indigo-600 text-2xl font-medium">{{ instructor.first_name.0 }}{{ instructor.last_name.0 }}</span>
+            </div>
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">{{ instructor.full_name }}</h1>
+                <p class="text-gray-600 mt-1">{{ instructor.specialization }}</p>
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'core:generate_contract_pdf' instructor.pk %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">Generate Contract</a>
+            <a href="{% url 'core:instructor_edit' instructor.pk %}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">Edit</a>
+            <a href="{% url 'core:instructor_delete' instructor.pk %}" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">Delete</a>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-1">
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Contact Information</h2>
+            <div class="space-y-4">
+                <div>
+                    <p class="text-sm text-gray-500">Email</p>
+                    <p class="font-medium text-gray-800">{{ instructor.email }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Phone</p>
+                    <p class="font-medium text-gray-800">{{ instructor.phone|default:"Not provided" }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Specialization</p>
+                    <p class="font-medium text-gray-800">{{ instructor.specialization }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Hourly Rate</p>
+                    <p class="font-medium text-gray-800">{{ instructor.hourly_rate }} DH</p>
+                </div>
+            </div>
+            
+            <hr class="my-6">
+            
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500">Status</span>
+                {% if instructor.is_active %}
+                <span class="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                {% else %}
+                <span class="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="lg:col-span-2 space-y-8">
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Assigned Courses</h2>
+            <div class="space-y-4">
+                {% for course in courses %}
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                        <a href="{% url 'core:course_detail' course.pk %}" class="font-medium text-gray-800 hover:text-blue-600">{{ course.name }}</a>
+                        <p class="text-sm text-gray-500">{{ course.get_course_type_display }} - {{ course.get_subject_display }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-gray-500">{{ course.enrolled_count }} students</p>
+                        <p class="text-sm font-medium text-gray-800">{{ course.monthly_fee }} DH/month</p>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-gray-500 text-center py-4">No courses assigned</p>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Payment History</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for payment in payments %}
+                        <tr>
+                            <td class="px-4 py-3 text-sm text-gray-800">{{ payment.month|date:"F Y" }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-800">{{ payment.amount }} DH</td>
+                            <td class="px-4 py-3 text-sm text-gray-800">{{ payment.amount_paid }} DH</td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full 
+                                    {% if payment.status == 'paid' %}bg-green-100 text-green-800
+                                    {% elif payment.status == 'pending' %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                    {{ payment.get_status_display }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-4 py-3 text-center text-gray-500">No payments recorded</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+/* Custom styles for Educational Cooperative System */
+
+/* Ensure tables are responsive */
+.table-responsive {
+    overflow-x: auto;
+}
+
+/* Print styles for PDF generation */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+}

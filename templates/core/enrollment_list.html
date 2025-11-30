@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Enrollments - Educational Cooperative{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Enrollments</h1>
+        <p class="text-gray-600 mt-1">Manage student enrollments</p>
+    </div>
+    <a href="{% url 'core:enrollment_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        New Enrollment
+    </a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+    <form method="get" class="flex gap-4">
+        <select name="course" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="">All Courses</option>
+            {% for course in courses %}
+            <option value="{{ course.pk }}" {% if selected_course == course.pk|stringformat:"s" %}selected{% endif %}>{{ course.name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg font-medium transition-colors">Filter</button>
+    </form>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enrollment Date</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for enrollment in enrollments %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <a href="{% url 'core:student_detail' enrollment.student.pk %}" class="text-sm font-medium text-gray-900 hover:text-blue-600">{{ enrollment.student.full_name }}</a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <a href="{% url 'core:course_detail' enrollment.course.pk %}" class="text-sm text-gray-500 hover:text-blue-600">{{ enrollment.course.name }}</a>
+                    <p class="text-xs text-gray-400">{{ enrollment.course.get_course_type_display }}</p>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ enrollment.enrollment_date }}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% if enrollment.is_active %}
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                    {% else %}
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <a href="{% url 'core:enrollment_delete' enrollment.pk %}" class="text-red-600 hover:text-red-900">Remove</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="px-6 py-4 text-center text-gray-500">No enrollments found</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

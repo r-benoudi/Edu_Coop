@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Student Fees - Educational Cooperative{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Student Fees</h1>
+        <p class="text-gray-600 mt-1">Track student fee payments</p>
+    </div>
+    <a href="{% url 'core:generate_monthly_payments' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">Generate Monthly Payments</a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+    <form method="get" class="flex gap-4">
+        <select name="status" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="">All Statuses</option>
+            <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="paid" {% if selected_status == 'paid' %}selected{% endif %}>Paid</option>
+            <option value="partial" {% if selected_status == 'partial' %}selected{% endif %}>Partial</option>
+            <option value="overdue" {% if selected_status == 'overdue' %}selected{% endif %}>Overdue</option>
+        </select>
+        <button type="submit" class="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg font-medium transition-colors">Filter</button>
+    </form>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paid</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for payment in payments %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <a href="{% url 'core:student_detail' payment.student.pk %}" class="text-sm font-medium text-gray-900 hover:text-blue-600">{{ payment.student.full_name }}</a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ payment.month|date:"F Y" }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{{ payment.amount }} DH</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{{ payment.amount_paid }} DH</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium {% if payment.remaining_amount > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                    {{ payment.remaining_amount }} DH
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        {% if payment.status == 'paid' %}bg-green-100 text-green-800
+                        {% elif payment.status == 'pending' %}bg-yellow-100 text-yellow-800
+                        {% elif payment.status == 'partial' %}bg-blue-100 text-blue-800
+                        {% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ payment.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    {% if payment.status != 'paid' %}
+                    <a href="{% url 'core:record_payment' payment.pk %}" class="text-green-600 hover:text-green-900 mr-3">Record Payment</a>
+                    {% endif %}
+                    <a href="{% url 'core:generate_invoice_pdf' payment.pk %}" class="text-blue-600 hover:text-blue-900">Invoice</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="px-6 py-4 text-center text-gray-500">No student fees found</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
