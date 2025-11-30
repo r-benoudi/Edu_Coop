@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Create User - Educational Cooperative{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <a href="{% url 'core:user_management' %}" class="text-blue-600 hover:text-blue-800 flex items-center mb-4">
+        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+        Back to Users
+    </a>
+    <h1 class="text-3xl font-bold text-gray-800">Create New User</h1>
+</div>
+
+<div class="max-w-2xl">
+    <div class="bg-white rounded-xl shadow-sm p-8">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="first_name" class="block text-sm font-medium text-gray-700 mb-2">
+                            First Name *
+                        </label>
+                        <input type="text" name="first_name" id="first_name" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label for="last_name" class="block text-sm font-medium text-gray-700 mb-2">
+                            Last Name *
+                        </label>
+                        <input type="text" name="last_name" id="last_name" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700 mb-2">
+                        Username *
+                    </label>
+                    <input type="text" name="username" id="username" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Must be unique">
+                </div>
+                
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                        Email *
+                    </label>
+                    <input type="email" name="email" id="email" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <div>
+                    <label for="role" class="block text-sm font-medium text-gray-700 mb-2">
+                        Role *
+                    </label>
+                    <select name="role" id="role" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select a role</option>
+                        {% for value, label in role_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+                        Password *
+                    </label>
+                    <input type="password" name="password" id="password" required minlength="8"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Minimum 8 characters">
+                    <p class="text-xs text-gray-500 mt-1">User will be able to change this password after first login</p>
+                </div>
+            </div>
+            
+            <div class="mt-8 flex gap-4">
+                <button type="submit" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                    Create User
+                </button>
+                <a href="{% url 'core:user_management' %}" 
+                    class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-lg font-medium transition-colors">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Role Descriptions -->
+    <div class="mt-8 bg-blue-50 border-l-4 border-blue-500 p-6 rounded-lg">
+        <h3 class="font-semibold text-blue-900 mb-3">Role Permissions</h3>
+        <dl class="space-y-2 text-sm text-blue-800">
+            <dt class="font-medium">Administrator:</dt>
+            <dd class="ml-4">- Full system access, user management, all reports</dd>
+            
+            <dt class="font-medium mt-2">Manager:</dt>
+            <dd class="ml-4">- Approve expenses, view reports, manage operations</dd>
+            
+            <dt class="font-medium mt-2">Accountant:</dt>
+            <dd class="ml-4">- Process payments, manage expenses, financial reports</dd>
+            
+            <dt class="font-medium mt-2">Instructor:</dt>
+            <dd class="ml-4">- View courses, record attendance, view own payments</dd>
+            
+            <dt class="font-medium mt-2">Staff:</dt>
+            <dd class="ml-4">- Basic access to students and courses</dd>
+        </dl>
+    </div>
+</div>
+{% endblock %}

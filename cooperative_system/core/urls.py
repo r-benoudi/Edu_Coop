@@ -6,6 +6,29 @@ app_name = 'core'
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
 
+    # Authentication
+    path('login/', views.user_login, name='login'),
+    path('logout/', views.user_logout, name='logout'),
+    path('change-password/', views.change_password, name='change_password'),
+    
+    # User Management (Admin only)
+    path('users/', views.user_management, name='user_management'),
+    path('users/create/', views.create_user, name='create_user'),
+    
+    # Expense Management
+    path('expenses/', views.expense_list, name='expense_list'),
+    path('expenses/add/', views.expense_create, name='expense_create'),
+    path('expenses/<int:pk>/approve/', views.expense_approve, name='expense_approve'),
+    path('expenses/<int:pk>/pay/', views.expense_mark_paid, name='expense_mark_paid'),
+    path('expenses/report/', views.expense_report, name='expense_report'),
+    
+    # Recurring Expenses
+    path('recurring-expenses/', views.recurring_expense_list, name='recurring_expense_list'),
+    path('recurring-expenses/create/', views.recurring_expense_create, name='recurring_expense_create'),
+    
+    # Audit Log
+    path('audit/', views.audit_log_view, name='audit_log'),
+
     # Intelligence & Automation (NEW)
     path('intelligence/', views.system_intelligence_dashboard, name='intelligence_dashboard'),
     path('compliance/', views.compliance_dashboard, name='compliance_dashboard'),

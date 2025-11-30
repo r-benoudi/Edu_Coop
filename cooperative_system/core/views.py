@@ -18,6 +18,75 @@ from .forms import (
 )
 from .pdf_generator import generate_invoice, generate_contract, generate_financial_report
 
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
+from django.db.models import Sum, Count, Q
+from django.http import HttpResponse, JsonResponse
+from django.utils import timezone
+from datetime import date, timedelta, datetime
+from decimal import Decimal
+from dateutil.relativedelta import relativedelta
+from collections import defaultdict
+
+from .models import (
+    Student, Instructor, Course, Enrollment, Attendance,
+    Payment, Member, InstructorHours, FinancialReport, ProfitDistribution
+)
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.db.models import Sum, Count, Q
+from django.http import JsonResponse
+from datetime import date, timedelta
+from decimal import Decimal
+from functools import wraps
+
+from .models import User, Expense, ExpenseCategory, RecurringExpense, AuditLog
+
+
+# ==============================================================================
+# ROLE-BASED ACCESS DECORATORS
+# ==============================================================================
+
+def admin_required(view_func):
+    """Decorator to require admin role"""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('core:login')
+        if not request.user.is_admin:
+            messages.error(request, 'You do not have permission to access this page.')
+            return redirect('core:dashboard')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def manager_required(view_func):
+    """Decorator to require manager or admin role"""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('core:login')
+        if not request.user.is_manager:
+            messages.error(request, 'You do not have permission to access this page.')
+            return redirect('core:dashboard')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def accountant_required(view_func):
+    """Decorator to require accountant, manager, or admin role"""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('core:login')
+        if not request.user.can_view_financials:
+            messages.error(request, 'You do not have permission to access this page.')
+            return redirect('core:dashboard')
+        return view_func(request, *args, **kwargs)
+    return wrapper
 
 # def dashboard(request):
 #     today = date.today()
@@ -66,7 +135,7 @@ from .pdf_generator import generate_invoice, generate_contract, generate_financi
 #         'courses_by_subject': courses_by_subject,
 #     }
 #     return render(request, 'core/dashboard.html', context)
-
+@login_required
 def dashboard(request):
     today = date.today()
     first_of_month = today.replace(day=1)
@@ -134,7 +203,7 @@ def dashboard(request):
         'top_courses': top_courses,
     }
     return render(request, 'core/dashboard.html', context)
-
+@login_required
 def student_list(request):
     students = Student.objects.all()
     search = request.GET.get('search', '')
@@ -147,6 +216,7 @@ def student_list(request):
     return render(request, 'core/student_list.html', {'students': students, 'search': search})
 
 
+@login_required
 def student_detail(request, pk):
     student = get_object_or_404(Student, pk=pk)
     enrollments = student.enrollments.select_related('course').all()
@@ -157,7 +227,8 @@ def student_detail(request, pk):
         'payments': payments
     })
 
-
+@login_required
+@manager_required
 def student_create(request):
     if request.method == 'POST':
         form = StudentForm(request.POST)
@@ -170,6 +241,8 @@ def student_create(request):
     return render(request, 'core/student_form.html', {'form': form, 'title': 'Add New Student'})
 
 
+@login_required
+@manager_required
 def student_edit(request, pk):
     student = get_object_or_404(Student, pk=pk)
     if request.method == 'POST':
@@ -183,6 +256,8 @@ def student_edit(request, pk):
     return render(request, 'core/student_form.html', {'form': form, 'title': 'Edit Student', 'student': student})
 
 
+@login_required
+@manager_required
 def student_delete(request, pk):
     student = get_object_or_404(Student, pk=pk)
     if request.method == 'POST':
@@ -193,6 +268,7 @@ def student_delete(request, pk):
     return render(request, 'core/confirm_delete.html', {'object': student, 'type': 'student'})
 
 
+@login_required
 def instructor_list(request):
     instructors = Instructor.objects.all()
     search = request.GET.get('search', '')
@@ -205,6 +281,7 @@ def instructor_list(request):
     return render(request, 'core/instructor_list.html', {'instructors': instructors, 'search': search})
 
 
+@login_required
 def instructor_detail(request, pk):
     instructor = get_object_or_404(Instructor, pk=pk)
     courses = instructor.courses.all()
@@ -217,7 +294,8 @@ def instructor_detail(request, pk):
         'hours': hours
     })
 
-
+@login_required
+@manager_required
 def instructor_create(request):
     if request.method == 'POST':
         form = InstructorForm(request.POST)
@@ -230,6 +308,8 @@ def instructor_create(request):
     return render(request, 'core/instructor_form.html', {'form': form, 'title': 'Add New Instructor'})
 
 
+@login_required
+@manager_required
 def instructor_edit(request, pk):
     instructor = get_object_or_404(Instructor, pk=pk)
     if request.method == 'POST':
@@ -243,6 +323,8 @@ def instructor_edit(request, pk):
     return render(request, 'core/instructor_form.html', {'form': form, 'title': 'Edit Instructor', 'instructor': instructor})
 
 
+@login_required
+@manager_required
 def instructor_delete(request, pk):
     instructor = get_object_or_404(Instructor, pk=pk)
     if request.method == 'POST':
@@ -253,6 +335,7 @@ def instructor_delete(request, pk):
     return render(request, 'core/confirm_delete.html', {'object': instructor, 'type': 'instructor'})
 
 
+@login_required
 def course_list(request):
     courses = Course.objects.all()
     course_type = request.GET.get('type', '')
@@ -269,7 +352,7 @@ def course_list(request):
         'subjects': Course.SUBJECT_CHOICES
     })
 
-
+@login_required
 def course_detail(request, pk):
     course = get_object_or_404(Course, pk=pk)
     enrollments = course.enrollments.filter(is_active=True).select_related('student')
@@ -281,6 +364,8 @@ def course_detail(request, pk):
     })
 
 
+@login_required
+@manager_required
 def course_create(request):
     if request.method == 'POST':
         form = CourseForm(request.POST)
@@ -293,6 +378,8 @@ def course_create(request):
     return render(request, 'core/course_form.html', {'form': form, 'title': 'Add New Course'})
 
 
+@login_required
+@manager_required
 def course_edit(request, pk):
     course = get_object_or_404(Course, pk=pk)
     if request.method == 'POST':
@@ -306,6 +393,8 @@ def course_edit(request, pk):
     return render(request, 'core/course_form.html', {'form': form, 'title': 'Edit Course', 'course': course})
 
 
+@login_required
+@manager_required
 def course_delete(request, pk):
     course = get_object_or_404(Course, pk=pk)
     if request.method == 'POST':
@@ -316,6 +405,7 @@ def course_delete(request, pk):
     return render(request, 'core/confirm_delete.html', {'object': course, 'type': 'course'})
 
 
+@login_required
 def enrollment_list(request):
     enrollments = Enrollment.objects.select_related('student', 'course').all()
     course_id = request.GET.get('course', '')
@@ -328,7 +418,8 @@ def enrollment_list(request):
         'selected_course': course_id
     })
 
-
+@login_required
+@manager_required
 def enrollment_create(request):
     if request.method == 'POST':
         form = EnrollmentForm(request.POST)
@@ -341,6 +432,8 @@ def enrollment_create(request):
     return render(request, 'core/enrollment_form.html', {'form': form, 'title': 'New Enrollment'})
 
 
+@login_required
+@manager_required
 def enrollment_delete(request, pk):
     enrollment = get_object_or_404(Enrollment, pk=pk)
     if request.method == 'POST':
@@ -350,11 +443,13 @@ def enrollment_delete(request, pk):
     return render(request, 'core/confirm_delete.html', {'object': enrollment, 'type': 'enrollment'})
 
 
+@login_required
 def attendance_list(request):
     attendances = Attendance.objects.select_related('enrollment__student', 'enrollment__course').order_by('-date')[:100]
     return render(request, 'core/attendance_list.html', {'attendances': attendances})
 
 
+@login_required
 def attendance_record(request):
     if request.method == 'POST':
         form = BulkAttendanceForm(request.POST)
@@ -386,7 +481,7 @@ def attendance_record(request):
         'selected_course': course_id
     })
 
-
+@login_required
 def attendance_report(request):
     course_id = request.GET.get('course')
     start_date = request.GET.get('start_date')
@@ -414,12 +509,13 @@ def attendance_report(request):
         'end_date': end_date
     })
 
-
+@login_required
 def payment_list(request):
     payments = Payment.objects.select_related('student', 'instructor').order_by('-month', '-created_at')[:100]
     return render(request, 'core/payment_list.html', {'payments': payments})
 
 
+@login_required
 def student_payment_list(request):
     payments = Payment.objects.filter(payment_type='student_fee').select_related('student').order_by('-month')
     status = request.GET.get('status')
@@ -428,11 +524,13 @@ def student_payment_list(request):
     return render(request, 'core/student_payment_list.html', {'payments': payments, 'selected_status': status})
 
 
+@login_required
 def instructor_payment_list(request):
     payments = Payment.objects.filter(payment_type='instructor_payment').select_related('instructor').order_by('-month')
     return render(request, 'core/instructor_payment_list.html', {'payments': payments})
 
 
+@login_required
 def generate_monthly_payments(request):
     if request.method == 'POST':
         form = GeneratePaymentsForm(request.POST)
@@ -508,6 +606,7 @@ def generate_monthly_payments(request):
     return render(request, 'core/generate_payments.html', {'form': form})
 
 
+@login_required
 def record_payment(request, pk):
     payment = get_object_or_404(Payment, pk=pk)
     if request.method == 'POST':
@@ -532,6 +631,8 @@ def record_payment(request, pk):
     return render(request, 'core/record_payment.html', {'form': form, 'payment': payment})
 
 
+@login_required
+@admin_required
 def member_list(request):
     members = Member.objects.all()
     member_type = request.GET.get('type')
@@ -540,12 +641,15 @@ def member_list(request):
     return render(request, 'core/member_list.html', {'members': members, 'selected_type': member_type})
 
 
+@login_required
+@admin_required
 def member_detail(request, pk):
     member = get_object_or_404(Member, pk=pk)
     distributions = member.profit_distributions.select_related('financial_report').all()[:10]
     return render(request, 'core/member_detail.html', {'member': member, 'distributions': distributions})
 
-
+@login_required
+@admin_required
 def member_create(request):
     if request.method == 'POST':
         form = MemberForm(request.POST)
@@ -558,6 +662,8 @@ def member_create(request):
     return render(request, 'core/member_form.html', {'form': form, 'title': 'Add New Member'})
 
 
+@login_required
+@admin_required
 def member_edit(request, pk):
     member = get_object_or_404(Member, pk=pk)
     if request.method == 'POST':
@@ -571,6 +677,8 @@ def member_edit(request, pk):
     return render(request, 'core/member_form.html', {'form': form, 'title': 'Edit Member', 'member': member})
 
 
+@login_required
+@admin_required
 def member_delete(request, pk):
     member = get_object_or_404(Member, pk=pk)
     if request.method == 'POST':
@@ -581,6 +689,7 @@ def member_delete(request, pk):
     return render(request, 'core/confirm_delete.html', {'object': member, 'type': 'member'})
 
 
+@login_required
 def financial_overview(request):
     reports = FinancialReport.objects.all()[:12]
     
@@ -615,12 +724,14 @@ def financial_overview(request):
     return render(request, 'core/financial_overview.html', context)
 
 
+@login_required
 def financial_report_detail(request, pk):
     report = get_object_or_404(FinancialReport, pk=pk)
     distributions = report.distributions.select_related('member').all()
     return render(request, 'core/financial_report_detail.html', {'report': report, 'distributions': distributions})
 
 
+@login_required
 def generate_financial_report(request):
     if request.method == 'POST':
         month_str = request.POST.get('month')
@@ -665,6 +776,8 @@ def generate_financial_report(request):
     return render(request, 'core/generate_financial_report.html')
 
 
+@login_required
+@admin_required
 def distribute_profits(request, pk):
     report = get_object_or_404(FinancialReport, pk=pk)
     
@@ -698,12 +811,16 @@ def distribute_profits(request, pk):
     return render(request, 'core/distribute_profits.html', {'report': report})
 
 
+@login_required
+@manager_required
 def generate_invoice_pdf(request, payment_pk):
     payment = get_object_or_404(Payment, pk=payment_pk)
     response = generate_invoice(payment)
     return response
 
 
+@login_required
+@manager_required
 def generate_contract_pdf(request, instructor_pk):
     instructor = get_object_or_404(Instructor, pk=instructor_pk)
     course_id = request.GET.get('course')
@@ -714,6 +831,7 @@ def generate_contract_pdf(request, instructor_pk):
     return response
 
 
+@login_required
 def generate_report_pdf(request, report_pk):
     report = get_object_or_404(FinancialReport, pk=report_pk)
     response = generate_financial_report(report)
@@ -722,24 +840,9 @@ def generate_report_pdf(request, report_pk):
 # Enhanced views.py with Intelligence & Automation Features
 # Add these new views to your existing core/views.py file
 
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib import messages
-from django.db.models import Sum, Count, Q
-from django.http import HttpResponse, JsonResponse
-from django.utils import timezone
-from datetime import date, timedelta, datetime
-from decimal import Decimal
-from dateutil.relativedelta import relativedelta
-from collections import defaultdict
-
-from .models import (
-    Student, Instructor, Course, Enrollment, Attendance,
-    Payment, Member, InstructorHours, FinancialReport, ProfitDistribution
-)
-
 
 # INTELLIGENCE & AUTOMATION FEATURES
-
+@login_required
 def system_intelligence_dashboard(request):
     """
     Dashboard showing automated suggestions and conflict detection
@@ -765,6 +868,7 @@ def system_intelligence_dashboard(request):
     return render(request, 'core/intelligence_dashboard.html', context)
 
 
+@login_required
 def detect_instructor_conflicts():
     """
     Detect conflicts in instructor availability and course overlaps
@@ -849,6 +953,7 @@ def detect_instructor_conflicts():
     
 #     return suggestions
 
+@login_required
 def generate_schedule_suggestions():
     suggestions = []
     
@@ -888,6 +993,7 @@ def generate_schedule_suggestions():
     
     return suggestions
 
+@login_required
 def calculate_financial_projections():
     """
     Calculate financial projections for different scenarios
@@ -941,6 +1047,7 @@ def calculate_financial_projections():
     }
 
 
+@login_required
 def calculate_scenario_revenue(student_count):
     """Calculate estimated revenue for a given number of students"""
     # Assuming 70% tutoring (250 DH) and 30% IT (500 DH) mix
@@ -949,6 +1056,7 @@ def calculate_scenario_revenue(student_count):
     return Decimal(tutoring_students * 250 + it_students * 500)
 
 
+@login_required
 def calculate_scenario_costs(student_count):
     """Calculate estimated instructor costs for a given number of students"""
     # Tutoring: 100 DH per student
@@ -1014,6 +1122,7 @@ def calculate_scenario_costs(student_count):
     
 #     return sorted(recommendations, key=lambda x: x['margin'], reverse=True)
 
+@login_required
 def analyze_course_performance():
     recommendations = []
     
@@ -1060,6 +1169,7 @@ def analyze_course_performance():
 
 # COMPLIANCE & LEGAL VIEWS
 
+@login_required
 def compliance_dashboard(request):
     """
     Dashboard showing legal compliance status and member management
@@ -1119,6 +1229,7 @@ def compliance_dashboard(request):
 
 # ENHANCED REPORTING
 
+@login_required
 def comprehensive_report(request):
     """
     Generate comprehensive report with all KPIs and metrics
@@ -1200,6 +1311,7 @@ def comprehensive_report(request):
 
 # API ENDPOINTS FOR STRUCTURED OUTPUT
 
+@login_required
 def api_financial_summary(request):
     """
     JSON API endpoint for financial summary
@@ -1230,6 +1342,7 @@ def api_financial_summary(request):
     return JsonResponse(data)
 
 
+@login_required
 def api_enrollment_stats(request):
     """
     JSON API endpoint for enrollment statistics
@@ -1260,3 +1373,395 @@ def api_enrollment_stats(request):
     
     return JsonResponse(stats)
 
+# ==============================================================================
+# AUTHENTICATION & EXPENSE VIEWS
+# Add these to your core/views.py file
+# ==============================================================================
+
+
+
+
+
+
+
+# ==============================================================================
+# AUTHENTICATION VIEWS
+# ==============================================================================
+
+def user_login(request):
+    """User login view"""
+    if request.user.is_authenticated:
+        return redirect('core:dashboard')
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            login(request, user)
+            
+            # Log the login
+            AuditLog.objects.create(
+                user=user,
+                action='login',
+                model_name='User',
+                description=f'{user.get_full_name()} logged in',
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
+            messages.success(request, f'Welcome back, {user.get_full_name()}!')
+            
+            # Redirect based on role
+            next_url = request.GET.get('next', 'core:dashboard')
+            return redirect(next_url)
+        else:
+            messages.error(request, 'Invalid username or password.')
+    
+    return render(request, 'core/login.html')
+
+
+@login_required
+def user_logout(request):
+    """User logout view"""
+    # Log the logout
+    AuditLog.objects.create(
+        user=request.user,
+        action='logout',
+        model_name='User',
+        description=f'{request.user.get_full_name()} logged out',
+        ip_address=request.META.get('REMOTE_ADDR')
+    )
+    
+    logout(request)
+    messages.success(request, 'You have been logged out successfully.')
+    return redirect('core:login')
+
+
+@login_required
+def change_password(request):
+    """Change password view"""
+    if request.method == 'POST':
+        current_password = request.POST.get('current_password')
+        new_password = request.POST.get('new_password')
+        confirm_password = request.POST.get('confirm_password')
+        
+        if not request.user.check_password(current_password):
+            messages.error(request, 'Current password is incorrect.')
+        elif new_password != confirm_password:
+            messages.error(request, 'New passwords do not match.')
+        elif len(new_password) < 8:
+            messages.error(request, 'Password must be at least 8 characters long.')
+        else:
+            request.user.set_password(new_password)
+            request.user.save()
+            update_session_auth_hash(request, request.user)
+            
+            messages.success(request, 'Password changed successfully.')
+            return redirect('core:dashboard')
+    
+    return render(request, 'core/change_password.html')
+
+
+@admin_required
+def user_management(request):
+    """Manage system users"""
+    users = User.objects.all().order_by('-date_joined')
+    
+    context = {
+        'users': users,
+        'total_users': users.count(),
+        'active_users': users.filter(is_active=True).count(),
+    }
+    return render(request, 'core/user_management.html', context)
+
+
+@admin_required
+def create_user(request):
+    """Create new user"""
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        role = request.POST.get('role')
+        password = request.POST.get('password')
+        
+        if User.objects.filter(username=username).exists():
+            messages.error(request, 'Username already exists.')
+        elif User.objects.filter(email=email).exists():
+            messages.error(request, 'Email already exists.')
+        else:
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                password=password,
+                role=role
+            )
+            
+            AuditLog.objects.create(
+                user=request.user,
+                action='create',
+                model_name='User',
+                object_id=user.pk,
+                description=f'Created user: {user.get_full_name()}',
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
+            messages.success(request, f'User {user.get_full_name()} created successfully.')
+            return redirect('core:user_management')
+    
+    return render(request, 'core/create_user.html', {'role_choices': User.ROLE_CHOICES})
+
+
+# ==============================================================================
+# EXPENSE MANAGEMENT VIEWS
+# ==============================================================================
+
+@login_required
+@accountant_required
+def expense_list(request):
+    """List all expenses with filtering"""
+    expenses = Expense.objects.select_related('submitted_by', 'approved_by', 'category').all()
+    
+    # Filtering
+    expense_type = request.GET.get('type')
+    status = request.GET.get('status')
+    month = request.GET.get('month')
+    
+    if expense_type:
+        expenses = expenses.filter(expense_type=expense_type)
+    if status:
+        expenses = expenses.filter(status=status)
+    if month:
+        expenses = expenses.filter(month=month)
+    
+    # Statistics
+    total_expenses = expenses.filter(status='paid').aggregate(
+        total=Sum('amount')
+    )['total'] or Decimal('0')
+    
+    pending_count = expenses.filter(status='pending').count()
+    
+    context = {
+        'expenses': expenses[:100],
+        'total_expenses': total_expenses,
+        'pending_count': pending_count,
+        'expense_types': Expense.EXPENSE_TYPE_CHOICES,
+        'status_choices': Expense.STATUS_CHOICES,
+        'selected_type': expense_type,
+        'selected_status': status,
+    }
+    return render(request, 'core/expense_list.html', context)
+
+
+@login_required
+@manager_required
+def expense_create(request):
+    """Create new expense"""
+    if request.method == 'POST':
+        expense_type = request.POST.get('expense_type')
+        description = request.POST.get('description')
+        amount = request.POST.get('amount')
+        expense_date = request.POST.get('expense_date')
+        month = request.POST.get('month')
+        category_id = request.POST.get('category')
+        receipt_file = request.FILES.get('receipt_file')
+        notes = request.POST.get('notes', '')
+        
+        expense = Expense.objects.create(
+            expense_type=expense_type,
+            description=description,
+            amount=amount,
+            expense_date=expense_date,
+            month=month,
+            category_id=category_id if category_id else None,
+            receipt_file=receipt_file,
+            notes=notes,
+            submitted_by=request.user,
+            status='pending' if not request.user.is_admin else 'approved'
+        )
+        
+        AuditLog.objects.create(
+            user=request.user,
+            action='create',
+            model_name='Expense',
+            object_id=expense.pk,
+            description=f'Created expense: {expense.description} - {expense.amount} DH',
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        messages.success(request, 'Expense submitted successfully.')
+        return redirect('core:expense_list')
+    
+    categories = ExpenseCategory.objects.filter(is_active=True)
+    context = {
+        'expense_types': Expense.EXPENSE_TYPE_CHOICES,
+        'categories': categories,
+    }
+    return render(request, 'core/expense_form.html', context)
+
+
+@login_required
+@manager_required
+def expense_approve(request, pk):
+    """Approve an expense"""
+    expense = get_object_or_404(Expense, pk=pk)
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'approve':
+            expense.status = 'approved'
+            expense.approved_by = request.user
+            expense.approval_date = date.today()
+            expense.save()
+            
+            AuditLog.objects.create(
+                user=request.user,
+                action='approve',
+                model_name='Expense',
+                object_id=expense.pk,
+                description=f'Approved expense: {expense.description} - {expense.amount} DH',
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
+            messages.success(request, 'Expense approved successfully.')
+        elif action == 'reject':
+            expense.status = 'rejected'
+            expense.save()
+            
+            messages.info(request, 'Expense rejected.')
+        
+        return redirect('core:expense_list')
+    
+    return render(request, 'core/expense_approve.html', {'expense': expense})
+
+
+@login_required
+@accountant_required
+def expense_mark_paid(request, pk):
+    """Mark expense as paid"""
+    expense = get_object_or_404(Expense, pk=pk)
+    
+    if request.method == 'POST':
+        expense.status = 'paid'
+        expense.paid_date = request.POST.get('paid_date', date.today())
+        expense.payment_method = request.POST.get('payment_method', '')
+        expense.receipt_number = request.POST.get('receipt_number', '')
+        expense.save()
+        
+        AuditLog.objects.create(
+            user=request.user,
+            action='payment',
+            model_name='Expense',
+            object_id=expense.pk,
+            description=f'Marked expense as paid: {expense.description} - {expense.amount} DH',
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        messages.success(request, 'Expense marked as paid.')
+        return redirect('core:expense_list')
+    
+    return render(request, 'core/expense_mark_paid.html', {'expense': expense})
+
+
+@login_required
+@accountant_required
+def expense_report(request):
+    """Generate expense report"""
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    
+    expenses = Expense.objects.filter(status='paid')
+    
+    if start_date:
+        expenses = expenses.filter(expense_date__gte=start_date)
+    if end_date:
+        expenses = expenses.filter(expense_date__lte=end_date)
+    
+    # Summary by type
+    by_type = expenses.values('expense_type').annotate(
+        total=Sum('amount'),
+        count=Count('id')
+    ).order_by('-total')
+    
+    # Monthly summary
+    by_month = expenses.values('month').annotate(
+        total=Sum('amount'),
+        count=Count('id')
+    ).order_by('-month')[:12]
+    
+    total = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    
+    context = {
+        'expenses': expenses[:100],
+        'by_type': by_type,
+        'by_month': by_month,
+        'total': total,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'core/expense_report.html', context)
+
+
+@login_required
+@accountant_required
+def recurring_expense_list(request):
+    """List all recurring expenses"""
+    recurring_expenses = RecurringExpense.objects.all()
+    
+    context = {
+        'recurring_expenses': recurring_expenses,
+    }
+    return render(request, 'core/recurring_expense_list.html', context)
+
+
+@login_required
+@manager_required
+def recurring_expense_create(request):
+    """Create new recurring expense"""
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        expense_type = request.POST.get('expense_type')
+        amount = request.POST.get('amount')
+        frequency = request.POST.get('frequency')
+        start_date = request.POST.get('start_date')
+        description = request.POST.get('description', '')
+        
+        recurring_expense = RecurringExpense.objects.create(
+            name=name,
+            expense_type=expense_type,
+            amount=amount,
+            frequency=frequency,
+            start_date=start_date,
+            description=description
+        )
+        
+        messages.success(request, 'Recurring expense created successfully.')
+        return redirect('core:recurring_expense_list')
+    
+    context = {
+        'expense_types': Expense.EXPENSE_TYPE_CHOICES,
+        'frequency_choices': RecurringExpense.FREQUENCY_CHOICES,
+    }
+    return render(request, 'core/recurring_expense_form.html', context)
+
+
+# ==============================================================================
+# AUDIT LOG VIEW
+# ==============================================================================
+
+@login_required
+@admin_required
+def audit_log_view(request):
+    """View audit logs"""
+    logs = AuditLog.objects.select_related('user').all()[:200]
+    
+    context = {
+        'logs': logs,
+    }
+    return render(request, 'core/audit_log.html', context)

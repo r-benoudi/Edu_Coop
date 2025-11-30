@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management - Educational Cooperative{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">User Management</h1>
+        <p class="text-gray-600 mt-1">Manage system users and access controls</p>
+    </div>
+    <a href="{% url 'core:create_user' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        Add User
+    </a>
+</div>
+
+<!-- Summary Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
+        <p class="text-sm font-medium text-gray-500">Total Users</p>
+        <p class="text-3xl font-bold text-gray-800 mt-1">{{ total_users }}</p>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500">
+        <p class="text-sm font-medium text-gray-500">Active Users</p>
+        <p class="text-3xl font-bold text-gray-800 mt-1">{{ active_users }}</p>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-500">
+        <p class="text-sm font-medium text-gray-500">Roles</p>
+        <p class="text-3xl font-bold text-gray-800 mt-1">5</p>
+        <p class="text-xs text-gray-500 mt-1">Admin, Manager, Accountant, Instructor, Staff</p>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Login</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for user_obj in users %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 h-10 w-10 bg-gradient-to-br 
+                            {% if user_obj.role == 'admin' %}from-red-400 to-red-600
+                            {% elif user_obj.role == 'manager' %}from-blue-400 to-blue-600
+                            {% elif user_obj.role == 'accountant' %}from-green-400 to-green-600
+                            {% elif user_obj.role == 'instructor' %}from-purple-400 to-purple-600
+                            {% else %}from-gray-400 to-gray-600{% endif %}
+                            rounded-full flex items-center justify-center">
+                            <span class="text-white font-medium">
+                                {{ user_obj.first_name|first|upper }}{{ user_obj.last_name|first|upper }}
+                            </span>
+                        </div>
+                        <div class="ml-4">
+                            <div class="text-sm font-medium text-gray-900">{{ user_obj.get_full_name }}</div>
+                            <div class="text-sm text-gray-500">@{{ user_obj.username }}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {{ user_obj.email }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-3 py-1 text-xs font-semibold rounded-full
+                        {% if user_obj.role == 'admin' %}bg-red-100 text-red-800
+                        {% elif user_obj.role == 'manager' %}bg-blue-100 text-blue-800
+                        {% elif user_obj.role == 'accountant' %}bg-green-100 text-green-800
+                        {% elif user_obj.role == 'instructor' %}bg-purple-100 text-purple-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ user_obj.get_role_display }}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {{ user_obj.date_joined|date:"Y-m-d" }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {% if user_obj.last_login %}
+                    {{ user_obj.last_login|date:"Y-m-d H:i" }}
+                    {% else %}
+                    Never
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% if user_obj.is_active %}
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                    {% else %}
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                    No users found
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Role Descriptions -->
+<div class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-500">
+        <h3 class="font-semibold text-gray-800 mb-2">Administrator</h3>
+        <p class="text-sm text-gray-600">Full system access. Can manage users, view all data, and configure settings.</p>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
+        <h3 class="font-semibold text-gray-800 mb-2">Manager</h3>
+        <p class="text-sm text-gray-600">Manage operations, approve expenses, view financial reports.</p>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500">
+        <h3 class="font-semibold text-gray-800 mb-2">Accountant</h3>
+        <p class="text-sm text-gray-600">Process payments, manage expenses, generate financial reports.</p>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-500">
+        <h3 class="font-semibold text-gray-800 mb-2">Instructor</h3>
+        <p class="text-sm text-gray-600">View courses, record attendance, access personal payment information.</p>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-gray-500">
+        <h3 class="font-semibold text-gray-800 mb-2">Staff</h3>
+        <p class="text-sm text-gray-600">Limited access. View students, courses, and basic operations.</p>
+    </div>
+</div>
+{% endblock %}

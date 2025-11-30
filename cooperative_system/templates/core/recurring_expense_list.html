@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+
+{% block title %}Recurring Expenses - Educational Cooperative{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">Recurring Expenses</h1>
+            <p class="text-gray-600 mt-1">Manage automatic monthly, quarterly, and yearly expenses</p>
+        </div>
+        <a href="{% url 'core:recurring_expense_create' %}" 
+            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add Recurring Expense
+        </a>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500">Active Recurring</p>
+                <p class="text-2xl font-bold text-gray-800">{{ active_count }}</p>
+            </div>
+            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500">Monthly Total</p>
+                <p class="text-2xl font-bold text-gray-800">{{ monthly_total|floatformat:2 }} DH</p>
+            </div>
+            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500">Quarterly Total</p>
+                <p class="text-2xl font-bold text-gray-800">{{ quarterly_total|floatformat:2 }} DH</p>
+            </div>
+            <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500">Yearly Total</p>
+                <p class="text-2xl font-bold text-gray-800">{{ yearly_total|floatformat:2 }} DH</p>
+            </div>
+            <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Info Box -->
+<div class="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-lg mb-6">
+    <div class="flex">
+        <svg class="w-6 h-6 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <div class="text-sm text-blue-800">
+            <p class="font-medium">About Recurring Expenses:</p>
+            <p class="mt-1">Recurring expenses are automatically generated based on their frequency. Enable "Auto Generate" to create expense entries automatically at the start of each period.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Recurring Expenses Table -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-800">Recurring Expense List</h2>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Frequency</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Generated</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Auto</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for recurring in recurring_expenses %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-medium text-gray-800">{{ recurring.name }}</p>
+                        {% if recurring.category %}
+                        <p class="text-xs text-gray-500">{{ recurring.category.name }}</p>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full
+                            {% if recurring.expense_type == 'rent' %}bg-purple-100 text-purple-800
+                            {% elif recurring.expense_type == 'utilities' %}bg-blue-100 text-blue-800
+                            {% elif recurring.expense_type == 'insurance' %}bg-green-100 text-green-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ recurring.get_expense_type_display }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ recurring.amount|floatformat:2 }} DH</td>
+                    <td class="px-6 py-4 text-sm">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full
+                            {% if recurring.frequency == 'monthly' %}bg-blue-100 text-blue-800
+                            {% elif recurring.frequency == 'quarterly' %}bg-purple-100 text-purple-800
+                            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ recurring.get_frequency_display }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-800">{{ recurring.start_date|date:"Y-m-d" }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">
+                        {% if recurring.last_generated %}
+                            {{ recurring.last_generated|date:"Y-m-d" }}
+                        {% else %}
+                            <span class="text-gray-400">Never</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        {% if recurring.is_active %}
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                            Active
+                        </span>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                            Inactive
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        {% if recurring.auto_generate %}
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        {% else %}
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="px-6 py-12 text-center">
+                        <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <p class="text-gray-500 text-lg font-medium">No recurring expenses found</p>
+                        <p class="text-gray-400 mt-1">Add your first recurring expense to automate tracking</p>
+                        <a href="{% url 'core:recurring_expense_create' %}" 
+                            class="mt-4 inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                            Add Recurring Expense
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Common Recurring Expenses Examples -->
+<div class="mt-6 bg-white rounded-xl shadow-sm p-6">
+    <h3 class="font-semibold text-gray-800 mb-3">Common Recurring Expenses</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div class="border border-gray-200 rounded-lg p-3">
+            <p class="font-medium text-gray-800">Monthly:</p>
+            <ul class="mt-2 space-y-1 text-gray-600">
+                <li>• Office Rent</li>
+                <li>• Electricity Bill</li>
+                <li>• Water Bill</li>
+                <li>• Internet Service</li>
+            </ul>
+        </div>
+        <div class="border border-gray-200 rounded-lg p-3">
+            <p class="font-medium text-gray-800">Quarterly:</p>
+            <ul class="mt-2 space-y-1 text-gray-600">
+                <li>• Insurance Premiums</li>
+                <li>• Property Tax</li>
+                <li>• Quarterly Maintenance</li>
+            </ul>
+        </div>
+        <div class="border border-gray-200 rounded-lg p-3">
+            <p class="font-medium text-gray-800">Yearly:</p>
+            <ul class="mt-2 space-y-1 text-gray-600">
+                <li>• Annual License Fees</li>
+                <li>• Software Subscriptions</li>
+                <li>• Annual Insurance</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,6 +1,14 @@
 import os
 from pathlib import Path
 
+# Custom User Model
+AUTH_USER_MODEL = 'core.User'
+
+# Login/Logout URLs
+LOGIN_URL = 'core:login'
+LOGIN_REDIRECT_URL = 'core:dashboard'
+LOGOUT_REDIRECT_URL = 'core:login'
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SESSION_SECRET', 'django-insecure-dev-key-change-in-production')

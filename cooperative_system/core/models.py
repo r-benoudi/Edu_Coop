@@ -250,3 +250,244 @@ class ProfitDistribution(models.Model):
     class Meta:
         unique_together = ['financial_report', 'member']
         ordering = ['-created_at']
+
+# ==============================================================================
+# AUTHENTICATION & EXPENSE TRACKING MODELS
+# Add these to your core/models.py file
+# ==============================================================================
+
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.core.validators import MinValueValidator
+from decimal import Decimal
+from datetime import date
+
+# ==============================================================================
+# CUSTOM USER MODEL WITH ROLES
+# ==============================================================================
+
+class User(AbstractUser):
+    """
+    Custom User model with role-based access control
+    """
+    ROLE_CHOICES = [
+        ('admin', 'Administrator'),
+        ('manager', 'Manager'),
+        ('accountant', 'Accountant'),
+        ('instructor', 'Instructor'),
+        ('staff', 'Staff'),
+    ]
+    
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff')
+    phone = models.CharField(max_length=20, blank=True)
+    instructor_profile = models.OneToOneField(
+        'Instructor', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='user_account'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.get_full_name()} ({self.get_role_display()})"
+    
+    @property
+    def is_admin(self):
+        return self.role == 'admin' or self.is_superuser
+    
+    @property
+    def is_manager(self):
+        return self.role in ['admin', 'manager'] or self.is_superuser
+    
+    @property
+    def is_accountant(self):
+        return self.role in ['admin', 'accountant'] or self.is_superuser
+    
+    @property
+    def can_view_financials(self):
+        return self.role in ['admin', 'manager', 'accountant'] or self.is_superuser
+    
+    class Meta:
+        ordering = ['-date_joined']
+
+
+# ==============================================================================
+# EXPENSE TRACKING
+# ==============================================================================
+
+class ExpenseCategory(models.Model):
+    """
+    Categories for operational expenses
+    """
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return self.name
+    
+    class Meta:
+        ordering = ['name']
+        verbose_name_plural = 'Expense Categories'
+
+
+class Expense(models.Model):
+    """
+    Track all operational expenses: rent, utilities, supplies, etc.
+    """
+    EXPENSE_TYPE_CHOICES = [
+        ('rent', 'Rent'),
+        ('utilities', 'Utilities'),
+        ('supplies', 'Supplies (Papers, etc.)'),
+        ('maintenance', 'Maintenance'),
+        ('marketing', 'Marketing'),
+        ('insurance', 'Insurance'),
+        ('salaries', 'Administrative Salaries'),
+        ('technology', 'Technology/Software'),
+        ('other', 'Other'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('paid', 'Paid'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    expense_type = models.CharField(max_length=20, choices=EXPENSE_TYPE_CHOICES)
+    category = models.ForeignKey(
+        ExpenseCategory, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='expenses'
+    )
+    description = models.TextField()
+    amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))]
+    )
+    expense_date = models.DateField(default=date.today)
+    month = models.DateField(help_text="First day of the billing month")
+    
+    # Approval workflow
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    submitted_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True,
+        related_name='submitted_expenses'
+    )
+    approved_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='approved_expenses'
+    )
+    approval_date = models.DateField(null=True, blank=True)
+    
+    # Payment tracking
+    paid_date = models.DateField(null=True, blank=True)
+    payment_method = models.CharField(max_length=50, blank=True)
+    receipt_number = models.CharField(max_length=100, blank=True)
+    
+    # Supporting documents
+    receipt_file = models.FileField(upload_to='expenses/receipts/', null=True, blank=True)
+    notes = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.get_expense_type_display()} - {self.amount} DH - {self.expense_date}"
+    
+    @property
+    def is_paid(self):
+        return self.status == 'paid'
+    
+    @property
+    def needs_approval(self):
+        return self.status == 'pending'
+    
+    class Meta:
+        ordering = ['-expense_date', '-created_at']
+
+
+class RecurringExpense(models.Model):
+    """
+    Manage recurring expenses (rent, utilities, etc.)
+    """
+    FREQUENCY_CHOICES = [
+        ('monthly', 'Monthly'),
+        ('quarterly', 'Quarterly'),
+        ('yearly', 'Yearly'),
+    ]
+    
+    name = models.CharField(max_length=200)
+    expense_type = models.CharField(max_length=20, choices=Expense.EXPENSE_TYPE_CHOICES)
+    category = models.ForeignKey(
+        ExpenseCategory, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES, default='monthly')
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    auto_generate = models.BooleanField(
+        default=True,
+        help_text="Automatically generate expense records"
+    )
+    last_generated = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name} - {self.amount} DH ({self.get_frequency_display()})"
+    
+    class Meta:
+        ordering = ['name']
+
+
+# ==============================================================================
+# AUDIT LOG
+# ==============================================================================
+
+class AuditLog(models.Model):
+    """
+    Track all important actions in the system
+    """
+    ACTION_CHOICES = [
+        ('create', 'Create'),
+        ('update', 'Update'),
+        ('delete', 'Delete'),
+        ('login', 'Login'),
+        ('logout', 'Logout'),
+        ('approve', 'Approve'),
+        ('reject', 'Reject'),
+        ('payment', 'Payment'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    model_name = models.CharField(max_length=100)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    description = models.TextField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.user} - {self.action} - {self.model_name} - {self.timestamp}"
+    
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Audit Log'
+        verbose_name_plural = 'Audit Logs'
