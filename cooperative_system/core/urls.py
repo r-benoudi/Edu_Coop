@@ -5,6 +5,15 @@ app_name = 'core'
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+
+    # Intelligence & Automation (NEW)
+    path('intelligence/', views.system_intelligence_dashboard, name='intelligence_dashboard'),
+    path('compliance/', views.compliance_dashboard, name='compliance_dashboard'),
+    path('reports/comprehensive/', views.comprehensive_report, name='comprehensive_report'),
+    
+    # API Endpoints (NEW)
+    path('api/financial-summary/', views.api_financial_summary, name='api_financial_summary'),
+    path('api/enrollment-stats/', views.api_enrollment_stats, name='api_enrollment_stats'),
     
     path('students/', views.student_list, name='student_list'),
     path('students/add/', views.student_create, name='student_create'),

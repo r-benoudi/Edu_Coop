@@ -19,6 +19,54 @@ from .forms import (
 from .pdf_generator import generate_invoice, generate_contract, generate_financial_report
 
 
+# def dashboard(request):
+#     today = date.today()
+#     first_of_month = today.replace(day=1)
+    
+#     total_students = Student.objects.filter(is_active=True).count()
+#     total_instructors = Instructor.objects.filter(is_active=True).count()
+#     total_courses = Course.objects.filter(is_active=True).count()
+#     total_enrollments = Enrollment.objects.filter(is_active=True).count()
+    
+#     monthly_revenue = Payment.objects.filter(
+#         payment_type='student_fee',
+#         month=first_of_month,
+#         status='paid'
+#     ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+    
+#     pending_payments = Payment.objects.filter(
+#         payment_type='student_fee',
+#         status__in=['pending', 'partial', 'overdue']
+#     ).count()
+    
+#     monthly_expenses = Payment.objects.filter(
+#         payment_type='instructor_payment',
+#         month=first_of_month,
+#         status='paid'
+#     ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+    
+#     estimated_profit = monthly_revenue - monthly_expenses
+    
+#     recent_enrollments = Enrollment.objects.select_related('student', 'course').order_by('-enrollment_date')[:5]
+#     recent_payments = Payment.objects.filter(payment_type='student_fee').select_related('student').order_by('-created_at')[:5]
+    
+#     courses_by_subject = Course.objects.filter(is_active=True).values('subject').annotate(count=Count('id'))
+    
+#     context = {
+#         'total_students': total_students,
+#         'total_instructors': total_instructors,
+#         'total_courses': total_courses,
+#         'total_enrollments': total_enrollments,
+#         'monthly_revenue': monthly_revenue,
+#         'pending_payments': pending_payments,
+#         'monthly_expenses': monthly_expenses,
+#         'estimated_profit': estimated_profit,
+#         'recent_enrollments': recent_enrollments,
+#         'recent_payments': recent_payments,
+#         'courses_by_subject': courses_by_subject,
+#     }
+#     return render(request, 'core/dashboard.html', context)
+
 def dashboard(request):
     today = date.today()
     first_of_month = today.replace(day=1)
@@ -33,6 +81,11 @@ def dashboard(request):
         month=first_of_month,
         status='paid'
     ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+    
+    expected_revenue = Payment.objects.filter(
+        payment_type='student_fee',
+        month=first_of_month
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
     
     pending_payments = Payment.objects.filter(
         payment_type='student_fee',
@@ -49,8 +102,21 @@ def dashboard(request):
     
     recent_enrollments = Enrollment.objects.select_related('student', 'course').order_by('-enrollment_date')[:5]
     recent_payments = Payment.objects.filter(payment_type='student_fee').select_related('student').order_by('-created_at')[:5]
-    
     courses_by_subject = Course.objects.filter(is_active=True).values('subject').annotate(count=Count('id'))
+    
+    # FIX: Build top_courses list manually to use the property
+    top_courses = []
+    for course in Course.objects.filter(is_active=True):
+        top_courses.append({
+            'name': course.name,
+            'enrolled_count': course.enrolled_count,  # Use property
+            'enrollment_limit': course.enrollment_limit,
+            'monthly_fee': course.monthly_fee,
+            'course_type': course.get_course_type_display(),
+            'pk': course.pk
+        })
+    top_courses.sort(key=lambda x: x['enrolled_count'], reverse=True)
+    top_courses = top_courses[:5]
     
     context = {
         'total_students': total_students,
@@ -58,15 +124,16 @@ def dashboard(request):
         'total_courses': total_courses,
         'total_enrollments': total_enrollments,
         'monthly_revenue': monthly_revenue,
+        'expected_revenue': expected_revenue,
         'pending_payments': pending_payments,
         'monthly_expenses': monthly_expenses,
         'estimated_profit': estimated_profit,
         'recent_enrollments': recent_enrollments,
         'recent_payments': recent_payments,
         'courses_by_subject': courses_by_subject,
+        'top_courses': top_courses,
     }
     return render(request, 'core/dashboard.html', context)
-
 
 def student_list(request):
     students = Student.objects.all()
@@ -651,3 +718,545 @@ def generate_report_pdf(request, report_pk):
     report = get_object_or_404(FinancialReport, pk=report_pk)
     response = generate_financial_report(report)
     return response
+
+# Enhanced views.py with Intelligence & Automation Features
+# Add these new views to your existing core/views.py file
+
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
+from django.db.models import Sum, Count, Q
+from django.http import HttpResponse, JsonResponse
+from django.utils import timezone
+from datetime import date, timedelta, datetime
+from decimal import Decimal
+from dateutil.relativedelta import relativedelta
+from collections import defaultdict
+
+from .models import (
+    Student, Instructor, Course, Enrollment, Attendance,
+    Payment, Member, InstructorHours, FinancialReport, ProfitDistribution
+)
+
+
+# INTELLIGENCE & AUTOMATION FEATURES
+
+def system_intelligence_dashboard(request):
+    """
+    Dashboard showing automated suggestions and conflict detection
+    """
+    # Detect instructor availability conflicts
+    conflicts = detect_instructor_conflicts()
+    
+    # Suggest optimal schedules
+    suggestions = generate_schedule_suggestions()
+    
+    # Calculate financial projections
+    projections = calculate_financial_projections()
+    
+    # Course optimization recommendations
+    course_recommendations = analyze_course_performance()
+    
+    context = {
+        'conflicts': conflicts,
+        'suggestions': suggestions,
+        'projections': projections,
+        'course_recommendations': course_recommendations,
+    }
+    return render(request, 'core/intelligence_dashboard.html', context)
+
+
+def detect_instructor_conflicts():
+    """
+    Detect conflicts in instructor availability and course overlaps
+    """
+    conflicts = []
+    
+    # Check if instructors are assigned to too many courses
+    for instructor in Instructor.objects.filter(is_active=True):
+        course_count = instructor.courses.filter(is_active=True).count()
+        if course_count > 5:  # Threshold for too many courses
+            conflicts.append({
+                'type': 'workload',
+                'severity': 'high',
+                'instructor': instructor,
+                'message': f'{instructor.full_name} is assigned to {course_count} courses (recommended max: 5)',
+                'recommendation': 'Consider redistributing some courses to other instructors'
+            })
+    
+    # Check for courses without instructors
+    courses_without_instructors = Course.objects.filter(
+        is_active=True,
+        instructors__isnull=True
+    )
+    for course in courses_without_instructors:
+        conflicts.append({
+            'type': 'staffing',
+            'severity': 'critical',
+            'course': course,
+            'message': f'{course.name} has no assigned instructor',
+            'recommendation': 'Assign an instructor immediately'
+        })
+    
+    # Check for overfilled courses
+    overfilled_courses = Course.objects.filter(is_active=True)
+    for course in overfilled_courses:
+        if course.enrolled_count >= course.enrollment_limit:
+            conflicts.append({
+                'type': 'capacity',
+                'severity': 'medium',
+                'course': course,
+                'message': f'{course.name} is at full capacity ({course.enrolled_count}/{course.enrollment_limit})',
+                'recommendation': 'Consider opening a new section or increasing capacity'
+            })
+    
+    return conflicts
+
+
+# def generate_schedule_suggestions():
+#     """
+#     Generate optimal course schedule suggestions
+#     """
+#     suggestions = []
+    
+#     # Analyze enrollment patterns
+#     popular_subjects = Course.objects.filter(is_active=True).annotate(
+#         enrollment_count=Count('enrollments', filter=Q(enrollments__is_active=True))
+#     ).order_by('-enrollment_count')[:3]
+    
+#     for course in popular_subjects:
+#         if course.enrollment_count >= course.enrollment_limit * 0.8:
+#             suggestions.append({
+#                 'type': 'expansion',
+#                 'priority': 'high',
+#                 'course': course,
+#                 'message': f'{course.name} is {int(course.enrollment_count/course.enrollment_limit*100)}% full',
+#                 'recommendation': f'Consider opening another section. Potential revenue: {course.monthly_fee * course.enrollment_limit} DH/month'
+#             })
+    
+#     # Suggest underperforming course actions
+#     underperforming = Course.objects.filter(is_active=True).annotate(
+#         enrollment_count=Count('enrollments', filter=Q(enrollments__is_active=True))
+#     ).filter(enrollment_count__lt=5)
+    
+#     for course in underperforming:
+#         suggestions.append({
+#             'type': 'optimization',
+#             'priority': 'medium',
+#             'course': course,
+#             'message': f'{course.name} has only {course.enrollment_count} students',
+#             'recommendation': 'Consider marketing efforts or merging with similar courses'
+#         })
+    
+#     return suggestions
+
+def generate_schedule_suggestions():
+    suggestions = []
+    
+    # FIX: Use property instead of annotation
+    popular_courses = Course.objects.filter(is_active=True)
+    course_list = []
+    for course in popular_courses:
+        course_list.append({
+            'course': course,
+            'count': course.enrolled_count
+        })
+    course_list.sort(key=lambda x: x['count'], reverse=True)
+    popular_subjects = course_list[:3]
+    
+    for item in popular_subjects:
+        course = item['course']
+        count = item['count']
+        if count >= course.enrollment_limit * 0.8:
+            suggestions.append({
+                'type': 'expansion',
+                'priority': 'high',
+                'course': course,
+                'message': f'{course.name} is {int(count/course.enrollment_limit*100)}% full',
+                'recommendation': f'Consider opening another section. Potential revenue: {course.monthly_fee * course.enrollment_limit} DH/month'
+            })
+    
+    # Underperforming courses
+    for course in Course.objects.filter(is_active=True):
+        if course.enrolled_count < 5:
+            suggestions.append({
+                'type': 'optimization',
+                'priority': 'medium',
+                'course': course,
+                'message': f'{course.name} has only {course.enrolled_count} students',
+                'recommendation': 'Consider marketing efforts or merging with similar courses'
+            })
+    
+    return suggestions
+
+def calculate_financial_projections():
+    """
+    Calculate financial projections for different scenarios
+    """
+    scenarios = []
+    
+    # Current state
+    current_students = Student.objects.filter(is_active=True).count()
+    current_revenue = Enrollment.objects.filter(is_active=True).aggregate(
+        total=Sum('course__monthly_fee')
+    )['total'] or Decimal('0')
+    
+    # Scenario 1: 50 students
+    scenario_50 = {
+        'name': '50 Students Scenario',
+        'students': 50,
+        'estimated_revenue': calculate_scenario_revenue(50),
+        'estimated_costs': calculate_scenario_costs(50),
+        'estimated_profit': None
+    }
+    scenario_50['estimated_profit'] = scenario_50['estimated_revenue'] - scenario_50['estimated_costs']
+    scenarios.append(scenario_50)
+    
+    # Scenario 2: 100 students
+    scenario_100 = {
+        'name': '100 Students Scenario',
+        'students': 100,
+        'estimated_revenue': calculate_scenario_revenue(100),
+        'estimated_costs': calculate_scenario_costs(100),
+        'estimated_profit': None
+    }
+    scenario_100['estimated_profit'] = scenario_100['estimated_revenue'] - scenario_100['estimated_costs']
+    scenarios.append(scenario_100)
+    
+    # Scenario 3: Multiple courses expansion
+    avg_fee = Decimal('350')  # Average between tutoring (250) and IT (500)
+    scenario_multi = {
+        'name': 'Multi-Course Expansion',
+        'students': current_students,
+        'estimated_revenue': current_revenue * Decimal('1.5'),  # 50% increase
+        'estimated_costs': calculate_scenario_costs(int(current_students * 1.3)),
+        'estimated_profit': None
+    }
+    scenario_multi['estimated_profit'] = scenario_multi['estimated_revenue'] - scenario_multi['estimated_costs']
+    scenarios.append(scenario_multi)
+    
+    return {
+        'current_students': current_students,
+        'current_monthly_revenue': current_revenue,
+        'scenarios': scenarios
+    }
+
+
+def calculate_scenario_revenue(student_count):
+    """Calculate estimated revenue for a given number of students"""
+    # Assuming 70% tutoring (250 DH) and 30% IT (500 DH) mix
+    tutoring_students = int(student_count * 0.7)
+    it_students = int(student_count * 0.3)
+    return Decimal(tutoring_students * 250 + it_students * 500)
+
+
+def calculate_scenario_costs(student_count):
+    """Calculate estimated instructor costs for a given number of students"""
+    # Tutoring: 100 DH per student
+    # IT: Assume 120 DH * 8 hours = 960 DH per instructor per course
+    # Assume 15 students per tutoring course, 20 students per IT course
+    
+    tutoring_students = int(student_count * 0.7)
+    it_students = int(student_count * 0.3)
+    
+    tutoring_cost = Decimal(tutoring_students * 100)
+    it_courses = max(1, it_students // 20)
+    it_cost = Decimal(it_courses * 960)
+    
+    return tutoring_cost + it_cost
+
+
+# def analyze_course_performance():
+#     """Analyze course performance and provide recommendations"""
+#     recommendations = []
+    
+#     courses = Course.objects.filter(is_active=True).annotate(
+#         enrollment_count=Count('enrollments', filter=Q(enrollments__is_active=True))
+#     )
+    
+#     for course in courses:
+#         # Calculate revenue per course
+#         revenue = course.monthly_fee * course.enrollment_count
+        
+#         # Calculate cost
+#         if course.course_type == 'tutoring':
+#             cost = Decimal('100') * course.enrollment_count
+#         else:
+#             # IT courses
+#             cost = Decimal('120') * min(8, course.duration_hours)
+        
+#         profit = revenue - cost
+#         margin = (profit / revenue * 100) if revenue > 0 else 0
+        
+#         # Generate recommendation based on performance
+#         if margin > 60:
+#             status = 'excellent'
+#             action = 'Maintain current strategy'
+#         elif margin > 40:
+#             status = 'good'
+#             action = 'Consider slight expansion'
+#         elif margin > 20:
+#             status = 'fair'
+#             action = 'Review pricing or reduce costs'
+#         else:
+#             status = 'poor'
+#             action = 'Urgent review needed - consider restructuring'
+        
+#         recommendations.append({
+#             'course': course,
+#             'revenue': revenue,
+#             'cost': cost,
+#             'profit': profit,
+#             'margin': margin,
+#             'status': status,
+#             'action': action,
+#             'enrollment_rate': int(course.enrollment_count / course.enrollment_limit * 100) if course.enrollment_limit > 0 else 0
+#         })
+    
+#     return sorted(recommendations, key=lambda x: x['margin'], reverse=True)
+
+def analyze_course_performance():
+    recommendations = []
+    
+    # FIX: Use different annotation name
+    courses = Course.objects.filter(is_active=True)
+    
+    for course in courses:
+        enrollment_count = course.enrolled_count  # Use the property
+        revenue = course.monthly_fee * enrollment_count
+        
+        if course.course_type == 'tutoring':
+            cost = Decimal('100') * enrollment_count
+        else:
+            cost = Decimal('120') * min(8, course.duration_hours)
+        
+        profit = revenue - cost
+        margin = (profit / revenue * 100) if revenue > 0 else 0
+        
+        if margin > 60:
+            status = 'excellent'
+            action = 'Maintain current strategy'
+        elif margin > 40:
+            status = 'good'
+            action = 'Consider slight expansion'
+        elif margin > 20:
+            status = 'fair'
+            action = 'Review pricing or reduce costs'
+        else:
+            status = 'poor'
+            action = 'Urgent review needed'
+        
+        recommendations.append({
+            'course': course,
+            'revenue': revenue,
+            'cost': cost,
+            'profit': profit,
+            'margin': margin,
+            'status': status,
+            'action': action,
+            'enrollment_rate': int(enrollment_count / course.enrollment_limit * 100) if course.enrollment_limit > 0 else 0
+        })
+    
+    return sorted(recommendations, key=lambda x: x['margin'], reverse=True)
+
+# COMPLIANCE & LEGAL VIEWS
+
+def compliance_dashboard(request):
+    """
+    Dashboard showing legal compliance status and member management
+    """
+    # Active vs Passive members breakdown
+    active_members = Member.objects.filter(is_active=True, member_type='active')
+    passive_members = Member.objects.filter(is_active=True, member_type='passive')
+    
+    # Capital shares breakdown
+    total_capital = Member.objects.filter(is_active=True).aggregate(
+        total=Sum('capital_shares')
+    )['total'] or Decimal('0')
+    
+    # Recent profit distributions
+    recent_distributions = ProfitDistribution.objects.select_related(
+        'member', 'financial_report'
+    ).order_by('-created_at')[:10]
+    
+    # Compliance checklist
+    compliance_items = [
+        {
+            'item': 'All members registered',
+            'status': Member.objects.filter(is_active=True).count() > 0,
+            'details': f'{Member.objects.filter(is_active=True).count()} active members'
+        },
+        {
+            'item': 'Capital shares properly distributed',
+            'status': total_capital > 0,
+            'details': f'Total capital: {total_capital} DH'
+        },
+        {
+            'item': 'Passive members (public employees) segregated',
+            'status': passive_members.exists(),
+            'details': f'{passive_members.count()} passive contributors'
+        },
+        {
+            'item': 'Transparent financial records',
+            'status': FinancialReport.objects.exists(),
+            'details': f'{FinancialReport.objects.count()} financial reports'
+        },
+        {
+            'item': 'Regular profit distribution',
+            'status': ProfitDistribution.objects.exists(),
+            'details': f'{ProfitDistribution.objects.count()} distributions made'
+        }
+    ]
+    
+    context = {
+        'active_members': active_members,
+        'passive_members': passive_members,
+        'total_capital': total_capital,
+        'recent_distributions': recent_distributions,
+        'compliance_items': compliance_items,
+    }
+    return render(request, 'core/compliance_dashboard.html', context)
+
+
+# ENHANCED REPORTING
+
+def comprehensive_report(request):
+    """
+    Generate comprehensive report with all KPIs and metrics
+    """
+    today = date.today()
+    first_of_month = today.replace(day=1)
+    
+    # Student metrics
+    total_students = Student.objects.filter(is_active=True).count()
+    new_students_this_month = Student.objects.filter(
+        registration_date__gte=first_of_month
+    ).count()
+    
+    # Revenue metrics
+    current_month_revenue = Payment.objects.filter(
+        payment_type='student_fee',
+        month=first_of_month,
+        status='paid'
+    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+    
+    expected_revenue = Payment.objects.filter(
+        payment_type='student_fee',
+        month=first_of_month
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    
+    # Expense metrics
+    instructor_payments = Payment.objects.filter(
+        payment_type='instructor_payment',
+        month=first_of_month,
+        status='paid'
+    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+    
+    # Enrollment metrics
+    enrollment_by_subject = Course.objects.filter(is_active=True).values(
+        'subject'
+    ).annotate(
+        students=Count('enrollments', filter=Q(enrollments__is_active=True))
+    )
+    
+    enrollment_by_type = Course.objects.filter(is_active=True).values(
+        'course_type'
+    ).annotate(
+        students=Count('enrollments', filter=Q(enrollments__is_active=True))
+    )
+    
+    # Attendance metrics
+    this_month_attendance = Attendance.objects.filter(
+        date__gte=first_of_month
+    ).values('status').annotate(count=Count('id'))
+    
+    attendance_rate = 0
+    if this_month_attendance:
+        total = sum(item['count'] for item in this_month_attendance)
+        present = next((item['count'] for item in this_month_attendance if item['status'] == 'present'), 0)
+        attendance_rate = (present / total * 100) if total > 0 else 0
+    
+    # Financial health indicators
+    profit_margin = ((current_month_revenue - instructor_payments) / current_month_revenue * 100) if current_month_revenue > 0 else 0
+    collection_rate = (current_month_revenue / expected_revenue * 100) if expected_revenue > 0 else 0
+    
+    context = {
+        'report_date': today,
+        'total_students': total_students,
+        'new_students_this_month': new_students_this_month,
+        'current_month_revenue': current_month_revenue,
+        'expected_revenue': expected_revenue,
+        'instructor_payments': instructor_payments,
+        'net_profit': current_month_revenue - instructor_payments,
+        'enrollment_by_subject': enrollment_by_subject,
+        'enrollment_by_type': enrollment_by_type,
+        'attendance_rate': attendance_rate,
+        'profit_margin': profit_margin,
+        'collection_rate': collection_rate,
+        'active_courses': Course.objects.filter(is_active=True).count(),
+        'active_instructors': Instructor.objects.filter(is_active=True).count(),
+    }
+    return render(request, 'core/comprehensive_report.html', context)
+
+
+# API ENDPOINTS FOR STRUCTURED OUTPUT
+
+def api_financial_summary(request):
+    """
+    JSON API endpoint for financial summary
+    """
+    today = date.today()
+    first_of_month = today.replace(day=1)
+    
+    revenue = Payment.objects.filter(
+        payment_type='student_fee',
+        month=first_of_month,
+        status='paid'
+    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+    
+    expenses = Payment.objects.filter(
+        payment_type='instructor_payment',
+        month=first_of_month,
+        status='paid'
+    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+    
+    data = {
+        'month': first_of_month.strftime('%Y-%m'),
+        'revenue': float(revenue),
+        'expenses': float(expenses),
+        'profit': float(revenue - expenses),
+        'margin': float((revenue - expenses) / revenue * 100) if revenue > 0 else 0
+    }
+    
+    return JsonResponse(data)
+
+
+def api_enrollment_stats(request):
+    """
+    JSON API endpoint for enrollment statistics
+    """
+    stats = {
+        'total_students': Student.objects.filter(is_active=True).count(),
+        'total_courses': Course.objects.filter(is_active=True).count(),
+        'total_enrollments': Enrollment.objects.filter(is_active=True).count(),
+        'by_course_type': {},
+        'by_subject': {}
+    }
+    
+    # Group by course type
+    for course_type, label in Course.COURSE_TYPE_CHOICES:
+        count = Enrollment.objects.filter(
+            is_active=True,
+            course__course_type=course_type
+        ).count()
+        stats['by_course_type'][label] = count
+    
+    # Group by subject
+    for subject, label in Course.SUBJECT_CHOICES:
+        count = Enrollment.objects.filter(
+            is_active=True,
+            course__subject=subject
+        ).count()
+        stats['by_subject'][label] = count
+    
+    return JsonResponse(stats)
+
