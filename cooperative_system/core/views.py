@@ -45,48 +45,62 @@ from functools import wraps
 
 from .models import User, Expense, ExpenseCategory, RecurringExpense, AuditLog
 
+from .decorators import (
+    admin_required,
+    manager_required,
+    accountant_required,
+    instructor_required,
+    can_manage_students,
+    can_manage_courses,
+    can_manage_enrollments,
+    can_record_attendance,
+    can_view_payments,
+    can_manage_payments,
+    can_view_financials,
+)
+
 
 # ==============================================================================
 # ROLE-BASED ACCESS DECORATORS
 # ==============================================================================
 
-def admin_required(view_func):
-    """Decorator to require admin role"""
-    @wraps(view_func)
-    def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect('core:login')
-        if not request.user.is_admin:
-            messages.error(request, 'You do not have permission to access this page.')
-            return redirect('core:dashboard')
-        return view_func(request, *args, **kwargs)
-    return wrapper
+# def admin_required(view_func):
+#     """Decorator to require admin role"""
+#     @wraps(view_func)
+#     def wrapper(request, *args, **kwargs):
+#         if not request.user.is_authenticated:
+#             return redirect('core:login')
+#         if not request.user.is_admin:
+#             messages.error(request, 'You do not have permission to access this page.')
+#             return redirect('core:dashboard')
+#         return view_func(request, *args, **kwargs)
+#     return wrapper
 
 
-def manager_required(view_func):
-    """Decorator to require manager or admin role"""
-    @wraps(view_func)
-    def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect('core:login')
-        if not request.user.is_manager:
-            messages.error(request, 'You do not have permission to access this page.')
-            return redirect('core:dashboard')
-        return view_func(request, *args, **kwargs)
-    return wrapper
+# def manager_required(view_func):
+#     """Decorator to require manager or admin role"""
+#     @wraps(view_func)
+#     def wrapper(request, *args, **kwargs):
+#         if not request.user.is_authenticated:
+#             return redirect('core:login')
+#         if not request.user.is_manager:
+#             messages.error(request, 'You do not have permission to access this page.')
+#             return redirect('core:dashboard')
+#         return view_func(request, *args, **kwargs)
+#     return wrapper
 
 
-def accountant_required(view_func):
-    """Decorator to require accountant, manager, or admin role"""
-    @wraps(view_func)
-    def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect('core:login')
-        if not request.user.can_view_financials:
-            messages.error(request, 'You do not have permission to access this page.')
-            return redirect('core:dashboard')
-        return view_func(request, *args, **kwargs)
-    return wrapper
+# def accountant_required(view_func):
+#     """Decorator to require accountant, manager, or admin role"""
+#     @wraps(view_func)
+#     def wrapper(request, *args, **kwargs):
+#         if not request.user.is_authenticated:
+#             return redirect('core:login')
+#         if not request.user.can_view_financials:
+#             messages.error(request, 'You do not have permission to access this page.')
+#             return redirect('core:dashboard')
+#         return view_func(request, *args, **kwargs)
+#     return wrapper
 
 # def dashboard(request):
 #     today = date.today()
@@ -203,6 +217,7 @@ def dashboard(request):
         'top_courses': top_courses,
     }
     return render(request, 'core/dashboard.html', context)
+
 @login_required
 def student_list(request):
     students = Student.objects.all()
@@ -228,7 +243,7 @@ def student_detail(request, pk):
     })
 
 @login_required
-@manager_required
+@can_manage_students
 def student_create(request):
     if request.method == 'POST':
         form = StudentForm(request.POST)
@@ -242,7 +257,7 @@ def student_create(request):
 
 
 @login_required
-@manager_required
+@can_manage_students
 def student_edit(request, pk):
     student = get_object_or_404(Student, pk=pk)
     if request.method == 'POST':
@@ -365,7 +380,7 @@ def course_detail(request, pk):
 
 
 @login_required
-@manager_required
+@can_manage_courses
 def course_create(request):
     if request.method == 'POST':
         form = CourseForm(request.POST)
@@ -379,7 +394,7 @@ def course_create(request):
 
 
 @login_required
-@manager_required
+@can_manage_courses
 def course_edit(request, pk):
     course = get_object_or_404(Course, pk=pk)
     if request.method == 'POST':
@@ -419,7 +434,7 @@ def enrollment_list(request):
     })
 
 @login_required
-@manager_required
+@can_manage_enrollments
 def enrollment_create(request):
     if request.method == 'POST':
         form = EnrollmentForm(request.POST)
@@ -450,6 +465,7 @@ def attendance_list(request):
 
 
 @login_required
+@can_record_attendance
 def attendance_record(request):
     if request.method == 'POST':
         form = BulkAttendanceForm(request.POST)
@@ -510,12 +526,14 @@ def attendance_report(request):
     })
 
 @login_required
+@can_view_payments
 def payment_list(request):
     payments = Payment.objects.select_related('student', 'instructor').order_by('-month', '-created_at')[:100]
     return render(request, 'core/payment_list.html', {'payments': payments})
 
 
 @login_required
+@can_view_payments
 def student_payment_list(request):
     payments = Payment.objects.filter(payment_type='student_fee').select_related('student').order_by('-month')
     status = request.GET.get('status')
@@ -531,6 +549,7 @@ def instructor_payment_list(request):
 
 
 @login_required
+@can_view_financials
 def generate_monthly_payments(request):
     if request.method == 'POST':
         form = GeneratePaymentsForm(request.POST)
@@ -607,6 +626,7 @@ def generate_monthly_payments(request):
 
 
 @login_required
+@can_manage_payments
 def record_payment(request, pk):
     payment = get_object_or_404(Payment, pk=pk)
     if request.method == 'POST':
@@ -690,6 +710,7 @@ def member_delete(request, pk):
 
 
 @login_required
+@can_view_financials
 def financial_overview(request):
     reports = FinancialReport.objects.all()[:12]
     
@@ -725,6 +746,7 @@ def financial_overview(request):
 
 
 @login_required
+@can_view_financials
 def financial_report_detail(request, pk):
     report = get_object_or_404(FinancialReport, pk=pk)
     distributions = report.distributions.select_related('member').all()
@@ -732,6 +754,7 @@ def financial_report_detail(request, pk):
 
 
 @login_required
+@can_view_financials
 def generate_financial_report(request):
     if request.method == 'POST':
         month_str = request.POST.get('month')
@@ -832,6 +855,7 @@ def generate_contract_pdf(request, instructor_pk):
 
 
 @login_required
+@can_view_financials
 def generate_report_pdf(request, report_pk):
     report = get_object_or_404(FinancialReport, pk=report_pk)
     response = generate_financial_report(report)
@@ -843,6 +867,7 @@ def generate_report_pdf(request, report_pk):
 
 # INTELLIGENCE & AUTOMATION FEATURES
 @login_required
+@manager_required
 def system_intelligence_dashboard(request):
     """
     Dashboard showing automated suggestions and conflict detection
@@ -868,7 +893,6 @@ def system_intelligence_dashboard(request):
     return render(request, 'core/intelligence_dashboard.html', context)
 
 
-@login_required
 def detect_instructor_conflicts():
     """
     Detect conflicts in instructor availability and course overlaps
@@ -953,7 +977,7 @@ def detect_instructor_conflicts():
     
 #     return suggestions
 
-@login_required
+
 def generate_schedule_suggestions():
     suggestions = []
     
@@ -993,7 +1017,6 @@ def generate_schedule_suggestions():
     
     return suggestions
 
-@login_required
 def calculate_financial_projections():
     """
     Calculate financial projections for different scenarios
@@ -1047,7 +1070,6 @@ def calculate_financial_projections():
     }
 
 
-@login_required
 def calculate_scenario_revenue(student_count):
     """Calculate estimated revenue for a given number of students"""
     # Assuming 70% tutoring (250 DH) and 30% IT (500 DH) mix
@@ -1056,7 +1078,7 @@ def calculate_scenario_revenue(student_count):
     return Decimal(tutoring_students * 250 + it_students * 500)
 
 
-@login_required
+
 def calculate_scenario_costs(student_count):
     """Calculate estimated instructor costs for a given number of students"""
     # Tutoring: 100 DH per student
@@ -1122,7 +1144,6 @@ def calculate_scenario_costs(student_count):
     
 #     return sorted(recommendations, key=lambda x: x['margin'], reverse=True)
 
-@login_required
 def analyze_course_performance():
     recommendations = []
     
