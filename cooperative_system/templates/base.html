@@ -7,215 +7,507 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         [x-cloak] { display: none !important; }
+        * { font-family: 'Outfit', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Smooth transitions */
+        * { transition: all 0.2s ease; }
+        
+        /* Glassmorphism navbar */
+        .glass-nav {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+        
+        /* Animated gradient background */
+        .gradient-bg {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            position: relative;
+        }
+        
+        .gradient-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 300px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+            opacity: 0.03;
+            z-index: 0;
+        }
+        
+        /* Dropdown animations */
+        .dropdown-enter {
+            animation: dropdownEnter 0.3s ease-out;
+        }
+        
+        @keyframes dropdownEnter {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Hover effects */
+        .nav-item {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            transform: translateX(-50%);
+            transition: width 0.3s ease;
+        }
+        
+        .nav-item:hover::before {
+            width: 100%;
+        }
+        
+        /* Mobile menu animation */
+        .mobile-menu-enter {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        /* Badge styles */
+        .role-badge {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .role-badge::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .role-badge:hover::after {
+            width: 300px;
+            height: 300px;
+        }
+        
+        /* Message notifications */
+        .message-slide-in {
+            animation: messageSlide 0.4s ease-out;
+        }
+        
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Content area */
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="flex">
-        <!-- Sidebar -->
-        <aside class="w-64 bg-slate-800 min-h-screen fixed left-0 top-0 overflow-y-auto">
-            <!-- Header with User Profile -->
-            <div class="p-4 border-b border-slate-700">
-                <h1 class="text-white text-xl font-bold">EduCoop</h1>
-                <p class="text-slate-400 text-sm">Information System</p>
-            </div>
-
-            <!-- User Profile Section -->
-            <div class="p-4 border-b border-slate-700 bg-slate-900">
+<body class="gradient-bg min-h-screen">
+    <!-- Modern Navbar -->
+    <nav class="glass-nav sticky top-0 z-50" x-data="{ open: false, 
+        managementOpen: false, 
+        financialOpen: false, 
+        intelligenceOpen: false, 
+        adminOpen: false,
+        userMenuOpen: false }">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- Logo and Brand -->
                 <div class="flex items-center">
-                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold mr-3
-                        {% if user.role == 'admin' %}bg-red-500 text-white
-                        {% elif user.role == 'manager' %}bg-blue-500 text-white
-                        {% elif user.role == 'accountant' %}bg-green-500 text-white
-                        {% elif user.role == 'instructor' %}bg-purple-500 text-white
-                        {% else %}bg-gray-500 text-white{% endif %}">
-                        {{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+                    <a href="{% url 'core:dashboard' %}" class="flex items-center space-x-3 group">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center transform group-hover:rotate-12 transition-transform duration-300">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                            </svg>
+                        </div>
+                        <div class="hidden lg:block">
+                            <h1 class="text-xl font-bold text-white tracking-tight">EduCoop</h1>
+                            <p class="text-xs text-slate-400 -mt-0.5">Information System</p>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex md:items-center md:space-x-1">
+                    <!-- Dashboard -->
+                    <a href="{% url 'core:dashboard' %}" class="nav-item px-4 py-2 text-sm font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5">
+                        Dashboard
+                    </a>
+
+                    <!-- Management Dropdown -->
+                    {% if user_can_manage_students or user_can_manage_courses %}
+                    <div class="relative" @mouseenter="managementOpen = true" @mouseleave="managementOpen = false">
+                        <button class="nav-item px-4 py-2 text-sm font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5 flex items-center">
+                            Management
+                            <svg class="ml-1 w-4 h-4 transition-transform" :class="{'rotate-180': managementOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div x-show="managementOpen" 
+                             x-cloak
+                             class="dropdown-enter absolute left-0 mt-2 w-56 bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-700/50 py-2">
+                            {% if user_can_manage_students or user.role == 'instructor' %}
+                            <a href="{% url 'core:student_list' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                    </svg>
+                                    Students
+                                </div>
+                            </a>
+                            {% endif %}
+                            {% if user_is_manager %}
+                            <a href="{% url 'core:instructor_list' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                  <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                                    Instructors
+                                </div>
+                            </a>
+                            {% endif %}
+                            <a href="{% url 'core:course_list' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                                    Courses
+                                </div>
+                            </a>
+                            {% if user_can_manage_students %}
+                            <a href="{% url 'core:enrollment_list' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                                    Enrollments
+                                </div>
+                            </a>
+                            {% endif %}
+                            {% if user.role in 'instructor,staff,manager,admin' %}
+                            <a href="{% url 'core:attendance_list' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                                    Attendance
+                                </div>
+                            </a>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-white text-sm font-medium truncate">{{ user.get_full_name }}</p>
-                        <p class="text-slate-400 text-xs truncate">{{ user.get_role_display }}</p>
+                    {% endif %}
+
+                    <!-- Financial Dropdown -->
+                    {% if user_can_view_payments %}
+                    <div class="relative" @mouseenter="financialOpen = true" @mouseleave="financialOpen = false">
+                        <button class="nav-item px-4 py-2 text-sm font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5 flex items-center">
+                            Financial
+                            <svg class="ml-1 w-4 h-4 transition-transform" :class="{'rotate-180': financialOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div x-show="financialOpen" 
+                             x-cloak
+                             class="dropdown-enter absolute left-0 mt-2 w-56 bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-700/50 py-2">
+                            <a href="{% url 'core:payment_list' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                    </svg>
+                                    Payments
+                                </div>
+                            </a>
+                            <a href="{% url 'core:expense_list' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Expenses
+                                </div>
+                            </a>
+                            <a href="{% url 'core:financial_overview' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                    </svg>
+                                    Reports
+                                </div>
+                            </a>
+                        </div>
                     </div>
+                    {% endif %}
+
+                    <!-- Intelligence Dropdown (Manager+) -->
+                    {% if user_is_manager %}
+                    <div class="relative" @mouseenter="intelligenceOpen = true" @mouseleave="intelligenceOpen = false">
+                        <button class="nav-item px-4 py-2 text-sm font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5 flex items-center">
+                            Intelligence
+                            <svg class="ml-1 w-4 h-4 transition-transform" :class="{'rotate-180': intelligenceOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div x-show="intelligenceOpen" 
+                             x-cloak
+                             class="dropdown-enter absolute left-0 mt-2 w-56 bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-700/50 py-2">
+                            <a href="{% url 'core:intelligence_dashboard' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707"></path>
+                                    </svg>
+                                    AI Intelligence
+                                </div>
+                            </a>
+                            <a href="{% url 'core:compliance_dashboard' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04"></path>
+                                    </svg>
+                                    Compliance
+                                </div>
+                            </a>
+                            <a href="{% url 'core:comprehensive_report' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586"></path>
+                                    </svg>
+                                    Full Report
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Admin Dropdown -->
+                    {% if user_is_admin %}
+                    <div class="relative" @mouseenter="adminOpen = true" @mouseleave="adminOpen = false">
+                        <button class="nav-item px-4 py-2 text-sm font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5 flex items-center">
+                            Admin
+                            <svg class="ml-1 w-4 h-4 transition-transform" :class="{'rotate-180': adminOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div x-show="adminOpen" 
+                             x-cloak
+                             class="dropdown-enter absolute left-0 mt-2 w-56 bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-700/50 py-2">
+                            <a href="{% url 'core:member_list' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                                    Members
+                                </div>
+                            </a>
+                            <a href="{% url 'core:user_management' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                                    Users
+                                </div>
+                            </a>
+                            <a href="{% url 'core:audit_log' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                                    Audit Log
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- User Menu -->
+                <div class="flex items-center space-x-4">
+                    <!-- User Profile Dropdown -->
+                    <div class="relative" @click.outside="userMenuOpen = false">
+                        <button @click="userMenuOpen = !userMenuOpen" class="flex items-center space-x-3 px-3 py-2 rounded-xl hover:bg-white/10 transition-colors">
+                            <div class="w-9 h-9 rounded-xl role-badge flex items-center justify-center text-sm font-semibold
+                                {% if user.role == 'admin' %}bg-gradient-to-br from-red-500 to-red-600
+                                {% elif user.role == 'manager' %}bg-gradient-to-br from-blue-500 to-blue-600
+                                {% elif user.role == 'accountant' %}bg-gradient-to-br from-green-500 to-green-600
+                                {% elif user.role == 'instructor' %}bg-gradient-to-br from-purple-500 to-purple-600
+                                {% else %}bg-gradient-to-br from-gray-500 to-gray-600{% endif %} text-white shadow-lg">
+                                {{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+                            </div>
+                            <div class="hidden lg:block text-left">
+                                <p class="text-sm font-semibold text-white">{{ user.get_full_name }}</p>
+                                <p class="text-xs text-slate-400">{{ user.get_role_display }}</p>
+                            </div>
+                            <svg class="w-4 h-4 text-slate-400 transition-transform" :class="{'rotate-180': userMenuOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        
+                        <div x-show="userMenuOpen" 
+                             x-cloak
+                             class="dropdown-enter absolute right-0 mt-2 w-56 bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-700/50 py-2">
+                            <div class="px-4 py-3 border-b border-slate-700/50">
+                                <p class="text-sm font-semibold text-white">{{ user.get_full_name }}</p>
+                                <p class="text-xs text-slate-400 mt-0.5">{{ user.email }}</p>
+                            </div>
+                            <a href="{% url 'core:change_password' %}" class="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                        </svg>
+                                    Change Password
+                                </div>
+                            </a>
+                            <a href="{% url 'core:logout' %}" class="block px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                    </svg>
+                                    Logout
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Mobile menu button -->
+                    <button @click="open = !open" class="md:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+                        <svg class="w-6 h-6" :class="{'hidden': open, 'block': !open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                        <svg class="w-6 h-6" :class="{'block': open, 'hidden': !open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
-            
-            <nav class="mt-2">
-                <!-- Dashboard (All Users) -->
-                <a href="{% url 'core:dashboard' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                    </svg>
+        </div>
+
+        <!-- Mobile menu -->
+        <div x-show="open" 
+             x-cloak
+             class="md:hidden mobile-menu-enter bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50">
+            <div class="px-4 py-4 space-y-2">
+                <a href="{% url 'core:dashboard' %}" class="block px-4 py-3 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
                     Dashboard
                 </a>
                 
-                <!-- Management Section (Staff and above) -->
                 {% if user_can_manage_students or user_can_manage_courses %}
-                <div class="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">Management</div>
+                <div class="space-y-1">
+                    <p class="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Management</p>
+                    {% if user_can_manage_students or user.role == 'instructor' %}
+                    <a href="{% url 'core:student_list' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Students</a>
+                    {% endif %}
+                    {% if user_is_manager %}
+                    <a href="{% url 'core:instructor_list' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Instructors</a>
+                    {% endif %}
+                    <a href="{% url 'core:course_list' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Courses</a>
+                    {% if user_can_manage_students %}
+                    <a href="{% url 'core:enrollment_list' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Enrollments</a>
+                    {% endif %}
+                    {% if user.role in 'instructor,staff,manager,admin' %}
+                    <a href="{% url 'core:attendance_list' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Attendance</a>
+                    {% endif %}
+                </div>
                 {% endif %}
-                
-                <!-- Students (Staff and above) -->
-                {% if user_can_manage_students or user.role == 'instructor' %}
-                <a href="{% url 'core:student_list' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                    </svg>
-                    Students
-                </a>
-                {% endif %}
-                
-                <!-- Instructors (Manager and above) -->
-                {% if user_is_manager %}
-                <a href="{% url 'core:instructor_list' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                    Instructors
-                </a>
-                {% endif %}
-                
-                <!-- Courses (All users can view) -->
-                <a href="{% url 'core:course_list' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                    </svg>
-                    Courses
-                </a>
-                
-                <!-- Enrollments (Staff and above) -->
-                {% if user_can_manage_students %}
-                <a href="{% url 'core:enrollment_list' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                    </svg>
-                    Enrollments
-                </a>
-                {% endif %}
-                
-                <!-- Attendance (Instructors and above) -->
-                {% if user.role in 'instructor,staff,manager,admin' %}
-                <a href="{% url 'core:attendance_list' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                    Attendance
-                </a>
-                {% endif %}
-                
-                <!-- Financial Section (Accountant and above) -->
+
                 {% if user_can_view_payments %}
-                <div class="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">Financial</div>
-                
-                <a href="{% url 'core:payment_list' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                    Payments
-                </a>
-                
-                <a href="{% url 'core:expense_list' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                    </svg>
-                    Expenses
-                </a>
-                
-                <a href="{% url 'core:financial_overview' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                    Financial Reports
-                </a>
+                <div class="space-y-1">
+                    <p class="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Financial</p>
+                    <a href="{% url 'core:payment_list' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Payments</a>
+                    <a href="{% url 'core:expense_list' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Expenses</a>
+                    <a href="{% url 'core:financial_overview' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Reports</a>
+                </div>
                 {% endif %}
-                
-                <!-- Members (Admin only) -->
-                {% if user_is_admin %}
-                <a href="{% url 'core:member_list' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    </svg>
-                    Members
-                </a>
-                {% endif %}
-                
-                <!-- Intelligence & Compliance (Manager and above) -->
+
                 {% if user_is_manager %}
-                <div class="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">Intelligence</div>
-                
-                <a href="{% url 'core:intelligence_dashboard' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                    </svg>
-                    AI Intelligence
-                </a>
-                
-                <a href="{% url 'core:compliance_dashboard' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                    </svg>
-                    Legal Compliance
-                </a>
-                
-                <a href="{% url 'core:comprehensive_report' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    Full Report
-                </a>
+                <div class="space-y-1">
+                    <p class="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Intelligence</p>
+                    <a href="{% url 'core:intelligence_dashboard' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">AI Intelligence</a>
+                    <a href="{% url 'core:compliance_dashboard' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Compliance</a>
+                    <a href="{% url 'core:comprehensive_report' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Full Report</a>
+                </div>
                 {% endif %}
-                
-                <!-- Administration (Admin only) -->
+
                 {% if user_is_admin %}
-                <div class="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">Administration</div>
-                
-                <a href="{% url 'core:user_management' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                    </svg>
-                    Users
-                </a>
-                
-                <a href="{% url 'core:audit_log' %}" class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    Audit Log
-                </a>
+                <div class="space-y-1">
+                    <p class="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Administration</p>
+                    <a href="{% url 'core:member_list' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Members</a>
+                    <a href="{% url 'core:user_management' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Users</a>
+                    <a href="{% url 'core:audit_log' %}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Audit Log</a>
+                </div>
                 {% endif %}
-            </nav>
-            
-            <!-- User Menu at bottom -->
-            <div class="mt-auto border-t border-slate-700 p-4 absolute bottom-0 w-64 bg-slate-800">
-                <div class="space-y-2">
-                    <a href="{% url 'core:change_password' %}" class="flex items-center text-slate-300 hover:text-white text-sm">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
-                        </svg>
-                        Change Password
-                    </a>
-                    <a href="{% url 'core:logout' %}" class="flex items-center text-red-400 hover:text-red-300 text-sm">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                        </svg>
-                        Logout
-                    </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="content-wrapper max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% if messages %}
+        <div class="mb-6 space-y-2">
+            {% for message in messages %}
+            <div class="message-slide-in p-4 rounded-xl shadow-lg backdrop-blur-sm {% if message.tags == 'success' %}bg-green-500/10 border border-green-500/20 text-green-700{% elif message.tags == 'error' %}bg-red-500/10 border border-red-500/20 text-red-700{% elif message.tags == 'warning' %}bg-yellow-500/10 border border-yellow-500/20 text-yellow-700{% else %}bg-blue-500/10 border border-blue-500/20 text-blue-700{% endif %}">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {% if message.tags == 'success' %}
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        {% elif message.tags == 'error' %}
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        {% elif message.tags == 'warning' %}
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        {% else %}
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        {% endif %}
+                    </svg>
+                    <span class="font-medium">{{ message }}</span>
                 </div>
             </div>
-        </aside>
+            {% endfor %}
+        </div>
+        {% endif %}
         
-        <main class="flex-1 ml-64 p-8">
-            {% if messages %}
-            <div class="mb-4">
-                {% for message in messages %}
-                <div class="p-4 rounded-lg mb-2 {% if message.tags == 'success' %}bg-green-100 text-green-800{% elif message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-blue-100 text-blue-800{% endif %}">
-                    {{ message }}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-            
-            {% block content %}{% endblock %}
-        </main>
-    </div>
+        {% block content %}{% endblock %}
+    </main>
     
     {% block extra_js %}{% endblock %}
 </body>
