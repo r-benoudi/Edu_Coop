@@ -3,18 +3,18 @@ from datetime import date
 import random
 
 # --------- CREATE COURSES ---------
-course1, _ = Course.objects.get_or_create(
-    name="Mathematics Level 1",
-    course_type="tutoring",
-    subject="math",
-    monthly_fee=250
-)
+# course1, _ = Course.objects.get_or_create(
+#     name="Mathematics Level 1",
+#     course_type="tutoring",
+#     subject="math",
+#     monthly_fee=250
+# )
 
 course2, _ = Course.objects.get_or_create(
-    name="IT Training Essentials",
-    course_type="it_course",
-    subject="it_training",
-    monthly_fee=500
+    name="SVT 1BAC EX",
+    course_type="tutoring",
+    subject="life_sciences",
+    monthly_fee=250
 )
 
 # --------- 30 STUDENTS ---------
@@ -41,7 +41,7 @@ for i in range(30):
 
 # --------- ENROLLMENTS ---------
 for s in students:
-    Enrollment.objects.get_or_create(student=s, course=course1)
+    # Enrollment.objects.get_or_create(student=s, course=course1)
     Enrollment.objects.get_or_create(student=s, course=course2)
 
 print("Seed data created successfully!")
