@@ -84,10 +84,12 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
-    User, Student, Instructor, Course, Enrollment, Attendance,
-    Payment, Member, InstructorHours, FinancialReport, ProfitDistribution,
-    Expense, ExpenseCategory, RecurringExpense, AuditLog
+    User
 )
+from academics.models import Student, Instructor, Course, Enrollment, Attendance, InstructorHours
+from audit.models import AuditLog
+from finance.models import Payment, FinancialReport, Expense, RecurringExpense, ExpenseCategory
+from cooperative.models import Member, ProfitDistribution
 
 # ==============================================================================
 # AUTHENTICATION & USER MANAGEMENT

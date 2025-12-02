@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 # Custom User Model
-AUTH_USER_MODEL = 'core.User'
+AUTH_USER_MODEL = 'accounts.User'
 
 # Login/Logout URLs
 LOGIN_URL = 'core:login'
@@ -27,6 +27,11 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_tailwind',
     'core',
+    'accounts',
+    'academics',
+    'finance',
+    'cooperative',
+    'audit',
 ]
 
 MIDDLEWARE = [

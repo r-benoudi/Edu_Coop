@@ -1,5 +1,9 @@
 from django import forms
-from .models import Student, Instructor, Course, Enrollment, Attendance, Payment, Member, InstructorHours
+from .models import (
+    User,
+)
+from academics.models import Student, Instructor, Course, Enrollment, Attendance, InstructorHours
+from cooperative.models import Member
 
 class StudentForm(forms.ModelForm):
     class Meta:

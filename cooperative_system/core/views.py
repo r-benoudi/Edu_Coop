@@ -8,9 +8,13 @@ from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 
 from .models import (
-    Student, Instructor, Course, Enrollment, Attendance,
-    Payment, Member, InstructorHours, FinancialReport, ProfitDistribution
+    User,
+    
 )
+from academics.models import Student, Instructor, Course, Enrollment, Attendance, InstructorHours
+from audit.models import AuditLog
+from finance.models import Payment, FinancialReport, Expense, ExpenseCategory, RecurringExpense
+from cooperative.models import Member, ProfitDistribution
 from .forms import (
     StudentForm, InstructorForm, CourseForm, EnrollmentForm,
     AttendanceForm, BulkAttendanceForm, PaymentRecordForm,
@@ -28,11 +32,6 @@ from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 from collections import defaultdict
 
-from .models import (
-    Student, Instructor, Course, Enrollment, Attendance,
-    Payment, Member, InstructorHours, FinancialReport, ProfitDistribution
-)
-
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -43,7 +42,6 @@ from datetime import date, timedelta
 from decimal import Decimal
 from functools import wraps
 
-from .models import User, Expense, ExpenseCategory, RecurringExpense, AuditLog
 
 from .decorators import (
     admin_required,
@@ -289,6 +287,130 @@ def dashboard(request):
         'top_courses': top_courses,
     }
     return render(request, 'core/dashboard.html', context)
+
+
+"""
+CORRECTED PAYMENT GENERATION FUNCTION
+Replace the existing generate_monthly_payments function in cooperative_system/core/views.py
+with this corrected version.
+
+This fix ensures students enrolled in multiple courses pay for ALL courses,
+not just the first one.
+"""
+
+@login_required
+@can_view_financials
+def generate_monthly_payments(request):
+    if request.method == 'POST':
+        form = GeneratePaymentsForm(request.POST)
+        if form.is_valid():
+            month = form.cleaned_data['month'].replace(day=1)
+            
+            # =================================================================
+            # STUDENT PAYMENTS - FIXED TO HANDLE MULTIPLE COURSE ENROLLMENTS
+            # =================================================================
+            
+            # Group enrollments by student and calculate total fees
+            student_fees = {}
+            for enrollment in Enrollment.objects.filter(is_active=True).select_related('student', 'course'):
+                student = enrollment.student
+                if student.pk not in student_fees:
+                    student_fees[student.pk] = {
+                        'student': student,
+                        'total_amount': Decimal('0'),
+                        'courses': []
+                    }
+                # Add this course's fee to the student's total
+                student_fees[student.pk]['total_amount'] += enrollment.course.monthly_fee
+                # Track which courses are included
+                student_fees[student.pk]['courses'].append(enrollment.course.name)
+            
+            # Create or update payments for each student with their total fees
+            created_student_payments = 0
+            updated_student_payments = 0
+            for student_data in student_fees.values():
+                # Use update_or_create to handle both new and existing payments
+                payment, created = Payment.objects.update_or_create(
+                    student=student_data['student'],
+                    payment_type='student_fee',
+                    month=month,
+                    defaults={
+                        'amount': student_data['total_amount'],  # Total of ALL courses
+                        'status': 'pending',
+                        'notes': f"Courses: {', '.join(student_data['courses'])}"  # List all courses
+                    }
+                )
+                if created:
+                    created_student_payments += 1
+                else:
+                    updated_student_payments += 1
+            
+            # =================================================================
+            # INSTRUCTOR PAYMENTS - NO CHANGES NEEDED
+            # =================================================================
+            
+            created_instructor_payments = 0
+            instructor_totals = {}
+            
+            for course in Course.objects.filter(is_active=True).prefetch_related('instructors', 'enrollments'):
+                for instructor in course.instructors.all():
+                    if instructor.pk not in instructor_totals:
+                        instructor_totals[instructor.pk] = {'instructor': instructor, 'amount': Decimal('0')}
+                    
+                    if course.course_type == 'tutoring':
+                        student_count = course.enrollments.filter(is_active=True).count()
+                        amount = Decimal('100') * student_count
+                    else:
+                        hours_record = InstructorHours.objects.filter(
+                            instructor=instructor,
+                            course=course,
+                            month=month
+                        ).first()
+                        
+                        if hours_record:
+                            hours = min(hours_record.hours_worked, 8)
+                        else:
+                            hours = min(course.duration_hours, 8)
+                            InstructorHours.objects.create(
+                                instructor=instructor,
+                                course=course,
+                                month=month,
+                                hours_worked=hours
+                            )
+                        
+                        amount = Decimal('120') * hours
+                    
+                    instructor_totals[instructor.pk]['amount'] += amount
+            
+            for data in instructor_totals.values():
+                if data['amount'] > 0:
+                    payment, created = Payment.objects.get_or_create(
+                        instructor=data['instructor'],
+                        payment_type='instructor_payment',
+                        month=month,
+                        defaults={
+                            'amount': data['amount'],
+                            'status': 'pending'
+                        }
+                    )
+                    if created:
+                        created_instructor_payments += 1
+            
+            # =================================================================
+            # SUCCESS MESSAGE - ENHANCED TO SHOW UPDATES
+            # =================================================================
+            
+            message = f'Generated {created_student_payments} new student payments'
+            if updated_student_payments > 0:
+                message += f', updated {updated_student_payments} existing payments'
+            message += f', and {created_instructor_payments} instructor payments for {month.strftime("%B %Y")}.'
+            
+            messages.success(request, message)
+            return redirect('core:payment_list')
+    else:
+        form = GeneratePaymentsForm(initial={'month': date.today().replace(day=1)})
+    
+    return render(request, 'core/generate_payments.html', {'form': form})
 
 # ==============================================================================
 # ROLE-BASED ACCESS DECORATORS
@@ -778,81 +900,81 @@ def instructor_payment_list(request):
     return render(request, 'core/instructor_payment_list.html', {'payments': payments})
 
 
-@login_required
-@can_view_financials
-def generate_monthly_payments(request):
-    if request.method == 'POST':
-        form = GeneratePaymentsForm(request.POST)
-        if form.is_valid():
-            month = form.cleaned_data['month'].replace(day=1)
+# @login_required
+# @can_view_financials
+# def generate_monthly_payments(request):
+#     if request.method == 'POST':
+#         form = GeneratePaymentsForm(request.POST)
+#         if form.is_valid():
+#             month = form.cleaned_data['month'].replace(day=1)
             
-            created_student_payments = 0
-            for enrollment in Enrollment.objects.filter(is_active=True).select_related('student', 'course'):
-                payment, created = Payment.objects.get_or_create(
-                    student=enrollment.student,
-                    payment_type='student_fee',
-                    month=month,
-                    defaults={
-                        'amount': enrollment.course.monthly_fee,
-                        'status': 'pending'
-                    }
-                )
-                if created:
-                    created_student_payments += 1
+#             created_student_payments = 0
+#             for enrollment in Enrollment.objects.filter(is_active=True).select_related('student', 'course'):
+#                 payment, created = Payment.objects.get_or_create(
+#                     student=enrollment.student,
+#                     payment_type='student_fee',
+#                     month=month,
+#                     defaults={
+#                         'amount': enrollment.course.monthly_fee,
+#                         'status': 'pending'
+#                     }
+#                 )
+#                 if created:
+#                     created_student_payments += 1
             
-            created_instructor_payments = 0
-            instructor_totals = {}
+#             created_instructor_payments = 0
+#             instructor_totals = {}
             
-            for course in Course.objects.filter(is_active=True).prefetch_related('instructors', 'enrollments'):
-                for instructor in course.instructors.all():
-                    if instructor.pk not in instructor_totals:
-                        instructor_totals[instructor.pk] = {'instructor': instructor, 'amount': Decimal('0')}
+#             for course in Course.objects.filter(is_active=True).prefetch_related('instructors', 'enrollments'):
+#                 for instructor in course.instructors.all():
+#                     if instructor.pk not in instructor_totals:
+#                         instructor_totals[instructor.pk] = {'instructor': instructor, 'amount': Decimal('0')}
                     
-                    if course.course_type == 'tutoring':
-                        student_count = course.enrollments.filter(is_active=True).count()
-                        amount = Decimal('100') * student_count
-                    else:
-                        hours_record = InstructorHours.objects.filter(
-                            instructor=instructor,
-                            course=course,
-                            month=month
-                        ).first()
+#                     if course.course_type == 'tutoring':
+#                         student_count = course.enrollments.filter(is_active=True).count()
+#                         amount = Decimal('100') * student_count
+#                     else:
+#                         hours_record = InstructorHours.objects.filter(
+#                             instructor=instructor,
+#                             course=course,
+#                             month=month
+#                         ).first()
                         
-                        if hours_record:
-                            hours = min(hours_record.hours_worked, 8)
-                        else:
-                            hours = min(course.duration_hours, 8)
-                            InstructorHours.objects.create(
-                                instructor=instructor,
-                                course=course,
-                                month=month,
-                                hours_worked=hours
-                            )
+#                         if hours_record:
+#                             hours = min(hours_record.hours_worked, 8)
+#                         else:
+#                             hours = min(course.duration_hours, 8)
+#                             InstructorHours.objects.create(
+#                                 instructor=instructor,
+#                                 course=course,
+#                                 month=month,
+#                                 hours_worked=hours
+#                             )
                         
-                        amount = Decimal('120') * hours
+#                         amount = Decimal('120') * hours
                     
-                    instructor_totals[instructor.pk]['amount'] += amount
+#                     instructor_totals[instructor.pk]['amount'] += amount
             
-            for data in instructor_totals.values():
-                if data['amount'] > 0:
-                    payment, created = Payment.objects.get_or_create(
-                        instructor=data['instructor'],
-                        payment_type='instructor_payment',
-                        month=month,
-                        defaults={
-                            'amount': data['amount'],
-                            'status': 'pending'
-                        }
-                    )
-                    if created:
-                        created_instructor_payments += 1
+#             for data in instructor_totals.values():
+#                 if data['amount'] > 0:
+#                     payment, created = Payment.objects.get_or_create(
+#                         instructor=data['instructor'],
+#                         payment_type='instructor_payment',
+#                         month=month,
+#                         defaults={
+#                             'amount': data['amount'],
+#                             'status': 'pending'
+#                         }
+#                     )
+#                     if created:
+#                         created_instructor_payments += 1
             
-            messages.success(request, f'Generated {created_student_payments} student payments and {created_instructor_payments} instructor payments for {month.strftime("%B %Y")}.')
-            return redirect('core:payment_list')
-    else:
-        form = GeneratePaymentsForm(initial={'month': date.today().replace(day=1)})
+#             messages.success(request, f'Generated {created_student_payments} student payments and {created_instructor_payments} instructor payments for {month.strftime("%B %Y")}.')
+#             return redirect('core:payment_list')
+#     else:
+#         form = GeneratePaymentsForm(initial={'month': date.today().replace(day=1)})
     
-    return render(request, 'core/generate_payments.html', {'form': form})
+#     return render(request, 'core/generate_payments.html', {'form': form})
 
 
 @login_required
