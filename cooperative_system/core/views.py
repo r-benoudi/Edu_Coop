@@ -60,6 +60,236 @@ from .decorators import (
 )
 
 
+@login_required
+@can_view_financials
+def generate_financial_report(request):
+    if request.method == 'POST':
+        month_str = request.POST.get('month')
+        if month_str:
+            try:
+                year, month_num = month_str.split('-')
+                month = date(int(year), int(month_num), 1)
+            except:
+                month = date.today().replace(day=1)
+        else:
+            month = date.today().replace(day=1)
+        
+        # Calculate total revenue from paid student fees
+        total_revenue = Payment.objects.filter(
+            payment_type='student_fee',
+            month=month,
+            status='paid'
+        ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+        
+        # Calculate total instructor payments
+        total_instructor = Payment.objects.filter(
+            payment_type='instructor_payment',
+            month=month,
+            status='paid'
+        ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+        
+        # Calculate total operational expenses (NEW)
+        total_expenses = Expense.objects.filter(
+            month=month,
+            status='paid'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        # Calculate profits
+        gross_profit = total_revenue - total_instructor
+        net_profit = gross_profit - total_expenses  # Now includes expenses
+        
+        # Create or update the financial report
+        report, created = FinancialReport.objects.update_or_create(
+            month=month,
+            defaults={
+                'total_revenue': total_revenue,
+                'total_instructor_payments': total_instructor,
+                'total_expenses': total_expenses,  # Now properly set
+                'gross_profit': gross_profit,
+                'net_profit': net_profit,
+            }
+        )
+        
+        # Log the action
+        AuditLog.objects.create(
+            user=request.user,
+            action='create' if created else 'update',
+            model_name='FinancialReport',
+            object_id=report.pk,
+            description=f'{"Generated" if created else "Updated"} financial report for {month.strftime("%B %Y")}',
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        action = 'generated' if created else 'updated'
+        messages.success(request, f'Financial report for {month.strftime("%B %Y")} {action}. Total expenses: {total_expenses} DH included.')
+        return redirect('core:financial_report_detail', pk=report.pk)
+    
+    return render(request, 'core/generate_financial_report.html')
+
+
+@login_required
+@can_view_financials
+def financial_report_detail(request, pk):
+    report = get_object_or_404(FinancialReport, pk=pk)
+    distributions = report.distributions.select_related('member').all()
+    
+    # Get expense breakdown for this month
+    expense_breakdown = Expense.objects.filter(
+        month=report.month,
+        status='paid'
+    ).values('expense_type').annotate(
+        total=Sum('amount'),
+        count=Count('id')
+    ).order_by('-total')
+    
+    # Get individual expenses for this month
+    expenses = Expense.objects.filter(
+        month=report.month,
+        status='paid'
+    ).select_related('submitted_by', 'approved_by').order_by('-expense_date')
+    
+    context = {
+        'report': report,
+        'distributions': distributions,
+        'expense_breakdown': expense_breakdown,
+        'expenses': expenses,
+    }
+    return render(request, 'core/financial_report_detail.html', context)
+
+
+@login_required
+@can_view_financials
+def financial_overview(request):
+    reports = FinancialReport.objects.all()[:12]
+    
+    today = date.today()
+    first_of_month = today.replace(day=1)
+    
+    # Current month revenue
+    current_revenue = Payment.objects.filter(
+        payment_type='student_fee',
+        month=first_of_month
+    ).aggregate(
+        total=Sum('amount'),
+        paid=Sum('amount_paid')
+    )
+    
+    # Current month instructor payments
+    current_expenses = Payment.objects.filter(
+        payment_type='instructor_payment',
+        month=first_of_month
+    ).aggregate(
+        total=Sum('amount'),
+        paid=Sum('amount_paid')
+    )
+    
+    # Current month operational expenses (NEW)
+    current_operational_expenses = Expense.objects.filter(
+        month=first_of_month,
+        status='paid'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    
+    # Total expenses = instructor payments + operational expenses
+    total_current_expenses = (current_expenses.get('paid') or Decimal('0')) + current_operational_expenses
+    
+    # Member capital
+    total_capital = Member.objects.filter(is_active=True).aggregate(total=Sum('capital_shares'))['total'] or Decimal('0')
+    
+    context = {
+        'reports': reports,
+        'current_revenue': current_revenue,
+        'current_expenses': current_expenses,
+        'current_operational_expenses': current_operational_expenses,
+        'total_current_expenses': total_current_expenses,
+        'total_capital': total_capital,
+        'current_month': first_of_month,
+    }
+    return render(request, 'core/financial_overview.html', context)
+
+
+@login_required
+def dashboard(request):
+    today = date.today()
+    first_of_month = today.replace(day=1)
+    
+    total_students = Student.objects.filter(is_active=True).count()
+    total_instructors = Instructor.objects.filter(is_active=True).count()
+    total_courses = Course.objects.filter(is_active=True).count()
+    total_enrollments = Enrollment.objects.filter(is_active=True).count()
+    
+    # Revenue
+    monthly_revenue = Payment.objects.filter(
+        payment_type='student_fee',
+        month=first_of_month,
+        status='paid'
+    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+    
+    expected_revenue = Payment.objects.filter(
+        payment_type='student_fee',
+        month=first_of_month
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    
+    pending_payments = Payment.objects.filter(
+        payment_type='student_fee',
+        status__in=['pending', 'partial', 'overdue']
+    ).count()
+    
+    # Instructor payments
+    monthly_instructor_payments = Payment.objects.filter(
+        payment_type='instructor_payment',
+        month=first_of_month,
+        status='paid'
+    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+    
+    # Operational expenses (NEW)
+    monthly_operational_expenses = Expense.objects.filter(
+        month=first_of_month,
+        status='paid'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    
+    # Total expenses = instructor payments + operational expenses
+    monthly_expenses = monthly_instructor_payments + monthly_operational_expenses
+    
+    # Profit calculation now includes operational expenses
+    estimated_profit = monthly_revenue - monthly_expenses
+    
+    recent_enrollments = Enrollment.objects.select_related('student', 'course').order_by('-enrollment_date')[:5]
+    recent_payments = Payment.objects.filter(payment_type='student_fee').select_related('student').order_by('-created_at')[:5]
+    courses_by_subject = Course.objects.filter(is_active=True).values('subject').annotate(count=Count('id'))
+    
+    # Top courses
+    top_courses = []
+    for course in Course.objects.filter(is_active=True):
+        top_courses.append({
+            'name': course.name,
+            'enrolled_count': course.enrolled_count,
+            'enrollment_limit': course.enrollment_limit,
+            'monthly_fee': course.monthly_fee,
+            'course_type': course.get_course_type_display(),
+            'pk': course.pk
+        })
+    top_courses.sort(key=lambda x: x['enrolled_count'], reverse=True)
+    top_courses = top_courses[:5]
+    
+    context = {
+        'total_students': total_students,
+        'total_instructors': total_instructors,
+        'total_courses': total_courses,
+        'total_enrollments': total_enrollments,
+        'monthly_revenue': monthly_revenue,
+        'expected_revenue': expected_revenue,
+        'pending_payments': pending_payments,
+        'monthly_instructor_payments': monthly_instructor_payments,
+        'monthly_operational_expenses': monthly_operational_expenses,
+        'monthly_expenses': monthly_expenses,
+        'estimated_profit': estimated_profit,
+        'recent_enrollments': recent_enrollments,
+        'recent_payments': recent_payments,
+        'courses_by_subject': courses_by_subject,
+        'top_courses': top_courses,
+    }
+    return render(request, 'core/dashboard.html', context)
+
 # ==============================================================================
 # ROLE-BASED ACCESS DECORATORS
 # ==============================================================================
@@ -149,74 +379,74 @@ from .decorators import (
 #         'courses_by_subject': courses_by_subject,
 #     }
 #     return render(request, 'core/dashboard.html', context)
-@login_required
-def dashboard(request):
-    today = date.today()
-    first_of_month = today.replace(day=1)
+# @login_required
+# def dashboard(request):
+#     today = date.today()
+#     first_of_month = today.replace(day=1)
     
-    total_students = Student.objects.filter(is_active=True).count()
-    total_instructors = Instructor.objects.filter(is_active=True).count()
-    total_courses = Course.objects.filter(is_active=True).count()
-    total_enrollments = Enrollment.objects.filter(is_active=True).count()
+#     total_students = Student.objects.filter(is_active=True).count()
+#     total_instructors = Instructor.objects.filter(is_active=True).count()
+#     total_courses = Course.objects.filter(is_active=True).count()
+#     total_enrollments = Enrollment.objects.filter(is_active=True).count()
     
-    monthly_revenue = Payment.objects.filter(
-        payment_type='student_fee',
-        month=first_of_month,
-        status='paid'
-    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+#     monthly_revenue = Payment.objects.filter(
+#         payment_type='student_fee',
+#         month=first_of_month,
+#         status='paid'
+#     ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
     
-    expected_revenue = Payment.objects.filter(
-        payment_type='student_fee',
-        month=first_of_month
-    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+#     expected_revenue = Payment.objects.filter(
+#         payment_type='student_fee',
+#         month=first_of_month
+#     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
     
-    pending_payments = Payment.objects.filter(
-        payment_type='student_fee',
-        status__in=['pending', 'partial', 'overdue']
-    ).count()
+#     pending_payments = Payment.objects.filter(
+#         payment_type='student_fee',
+#         status__in=['pending', 'partial', 'overdue']
+#     ).count()
     
-    monthly_expenses = Payment.objects.filter(
-        payment_type='instructor_payment',
-        month=first_of_month,
-        status='paid'
-    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+#     monthly_expenses = Payment.objects.filter(
+#         payment_type='instructor_payment',
+#         month=first_of_month,
+#         status='paid'
+#     ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
     
-    estimated_profit = monthly_revenue - monthly_expenses
+#     estimated_profit = monthly_revenue - monthly_expenses
     
-    recent_enrollments = Enrollment.objects.select_related('student', 'course').order_by('-enrollment_date')[:5]
-    recent_payments = Payment.objects.filter(payment_type='student_fee').select_related('student').order_by('-created_at')[:5]
-    courses_by_subject = Course.objects.filter(is_active=True).values('subject').annotate(count=Count('id'))
+#     recent_enrollments = Enrollment.objects.select_related('student', 'course').order_by('-enrollment_date')[:5]
+#     recent_payments = Payment.objects.filter(payment_type='student_fee').select_related('student').order_by('-created_at')[:5]
+#     courses_by_subject = Course.objects.filter(is_active=True).values('subject').annotate(count=Count('id'))
     
-    # FIX: Build top_courses list manually to use the property
-    top_courses = []
-    for course in Course.objects.filter(is_active=True):
-        top_courses.append({
-            'name': course.name,
-            'enrolled_count': course.enrolled_count,  # Use property
-            'enrollment_limit': course.enrollment_limit,
-            'monthly_fee': course.monthly_fee,
-            'course_type': course.get_course_type_display(),
-            'pk': course.pk
-        })
-    top_courses.sort(key=lambda x: x['enrolled_count'], reverse=True)
-    top_courses = top_courses[:5]
+#     # FIX: Build top_courses list manually to use the property
+#     top_courses = []
+#     for course in Course.objects.filter(is_active=True):
+#         top_courses.append({
+#             'name': course.name,
+#             'enrolled_count': course.enrolled_count,  # Use property
+#             'enrollment_limit': course.enrollment_limit,
+#             'monthly_fee': course.monthly_fee,
+#             'course_type': course.get_course_type_display(),
+#             'pk': course.pk
+#         })
+#     top_courses.sort(key=lambda x: x['enrolled_count'], reverse=True)
+#     top_courses = top_courses[:5]
     
-    context = {
-        'total_students': total_students,
-        'total_instructors': total_instructors,
-        'total_courses': total_courses,
-        'total_enrollments': total_enrollments,
-        'monthly_revenue': monthly_revenue,
-        'expected_revenue': expected_revenue,
-        'pending_payments': pending_payments,
-        'monthly_expenses': monthly_expenses,
-        'estimated_profit': estimated_profit,
-        'recent_enrollments': recent_enrollments,
-        'recent_payments': recent_payments,
-        'courses_by_subject': courses_by_subject,
-        'top_courses': top_courses,
-    }
-    return render(request, 'core/dashboard.html', context)
+#     context = {
+#         'total_students': total_students,
+#         'total_instructors': total_instructors,
+#         'total_courses': total_courses,
+#         'total_enrollments': total_enrollments,
+#         'monthly_revenue': monthly_revenue,
+#         'expected_revenue': expected_revenue,
+#         'pending_payments': pending_payments,
+#         'monthly_expenses': monthly_expenses,
+#         'estimated_profit': estimated_profit,
+#         'recent_enrollments': recent_enrollments,
+#         'recent_payments': recent_payments,
+#         'courses_by_subject': courses_by_subject,
+#         'top_courses': top_courses,
+#     }
+#     return render(request, 'core/dashboard.html', context)
 
 @login_required
 def student_list(request):
@@ -709,94 +939,59 @@ def member_delete(request, pk):
     return render(request, 'core/confirm_delete.html', {'object': member, 'type': 'member'})
 
 
-@login_required
-@can_view_financials
-def financial_overview(request):
-    reports = FinancialReport.objects.all()[:12]
-    
-    today = date.today()
-    first_of_month = today.replace(day=1)
-    
-    current_revenue = Payment.objects.filter(
-        payment_type='student_fee',
-        month=first_of_month
-    ).aggregate(
-        total=Sum('amount'),
-        paid=Sum('amount_paid')
-    )
-    
-    current_expenses = Payment.objects.filter(
-        payment_type='instructor_payment',
-        month=first_of_month
-    ).aggregate(
-        total=Sum('amount'),
-        paid=Sum('amount_paid')
-    )
-    
-    total_capital = Member.objects.filter(is_active=True).aggregate(total=Sum('capital_shares'))['total'] or Decimal('0')
-    
-    context = {
-        'reports': reports,
-        'current_revenue': current_revenue,
-        'current_expenses': current_expenses,
-        'total_capital': total_capital,
-        'current_month': first_of_month,
-    }
-    return render(request, 'core/financial_overview.html', context)
+
+# @login_required
+# @can_view_financials
+# def financial_report_detail(request, pk):
+#     report = get_object_or_404(FinancialReport, pk=pk)
+#     distributions = report.distributions.select_related('member').all()
+#     return render(request, 'core/financial_report_detail.html', {'report': report, 'distributions': distributions})
 
 
-@login_required
-@can_view_financials
-def financial_report_detail(request, pk):
-    report = get_object_or_404(FinancialReport, pk=pk)
-    distributions = report.distributions.select_related('member').all()
-    return render(request, 'core/financial_report_detail.html', {'report': report, 'distributions': distributions})
-
-
-@login_required
-@can_view_financials
-def generate_financial_report(request):
-    if request.method == 'POST':
-        month_str = request.POST.get('month')
-        if month_str:
-            try:
-                year, month_num = month_str.split('-')
-                month = date(int(year), int(month_num), 1)
-            except:
-                month = date.today().replace(day=1)
-        else:
-            month = date.today().replace(day=1)
+# @login_required
+# @can_view_financials
+# def generate_financial_report(request):
+#     if request.method == 'POST':
+#         month_str = request.POST.get('month')
+#         if month_str:
+#             try:
+#                 year, month_num = month_str.split('-')
+#                 month = date(int(year), int(month_num), 1)
+#             except:
+#                 month = date.today().replace(day=1)
+#         else:
+#             month = date.today().replace(day=1)
         
-        total_revenue = Payment.objects.filter(
-            payment_type='student_fee',
-            month=month,
-            status='paid'
-        ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+#         total_revenue = Payment.objects.filter(
+#             payment_type='student_fee',
+#             month=month,
+#             status='paid'
+#         ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
         
-        total_instructor = Payment.objects.filter(
-            payment_type='instructor_payment',
-            month=month,
-            status='paid'
-        ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+#         total_instructor = Payment.objects.filter(
+#             payment_type='instructor_payment',
+#             month=month,
+#             status='paid'
+#         ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
         
-        gross_profit = total_revenue - total_instructor
-        net_profit = gross_profit
+#         gross_profit = total_revenue - total_instructor
+#         net_profit = gross_profit
         
-        report, created = FinancialReport.objects.update_or_create(
-            month=month,
-            defaults={
-                'total_revenue': total_revenue,
-                'total_instructor_payments': total_instructor,
-                'gross_profit': gross_profit,
-                'net_profit': net_profit,
-            }
-        )
+#         report, created = FinancialReport.objects.update_or_create(
+#             month=month,
+#             defaults={
+#                 'total_revenue': total_revenue,
+#                 'total_instructor_payments': total_instructor,
+#                 'gross_profit': gross_profit,
+#                 'net_profit': net_profit,
+#             }
+#         )
         
-        action = 'generated' if created else 'updated'
-        messages.success(request, f'Financial report for {month.strftime("%B %Y")} {action}.')
-        return redirect('core:financial_report_detail', pk=report.pk)
+#         action = 'generated' if created else 'updated'
+#         messages.success(request, f'Financial report for {month.strftime("%B %Y")} {action}.')
+#         return redirect('core:financial_report_detail', pk=report.pk)
     
-    return render(request, 'core/generate_financial_report.html')
+#     return render(request, 'core/generate_financial_report.html')
 
 
 @login_required
